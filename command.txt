@@ -1,0 +1,17 @@
+MAVROS COMMAND FOR TEST CONTROL BEHAVIOR :
+
+* ARMED:
+	rosrun mavros mavsafety arm
+
+*Switch to OFFBOARD:
+	rosrun mavros mavsys mode -c OFFBOARD
+
+* change mav_frame : 
+	rosservice call /mavros/setpoint_velocity/mav_frame "mav_frame: 8"
+
+* set local_position : 
+	rostopic pub -r 20 /mavros/setpoint_position/local geetry_msgs/PoseStamped '{header:{stamp: now, frame_id: "map"}, pose: { position: {x: 0.0, y: 0.0, z: 2.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}'
+
+* set velocity: 
+	 rostopic pub -r 20 /mavros/setpoint_velocity/cmd_stamped geometry_msgs/Twist '{linear: {x: 1.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 1.0}}'
+* 

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="dcontroller" type="dcontroller" name="dcontroller" output="screen">
+    </node>
+
+    <node pkg="dplanning" type="dplanning" name="dplanning" output="screen">
+    </node>
+</launch>
