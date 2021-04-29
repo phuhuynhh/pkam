@@ -6,8 +6,9 @@
 
 
 ## Overview
-- dcontroller: the customize controller base-on mavros.
-- dplaning: generate trajectory for controller.
+- **realsense 2** : Point cloud for octomap. 
+- **dcontroller**: the customize controller base-on mavros.
+- **dplaning**: generate trajectory for controller.
 
 
 ## Getting Started
@@ -45,15 +46,26 @@ DONT_RUN=1 make px4_sitl_default gazebo
 ### Installing 
 
 Create a catkin workspace:
-
 This folder will probably be already created since the previous process would have created it. If it is not present, do:
 
-```bash
+```bashrc
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws
 catkin init
 catkin config --merge-devel
 wstool init
+```
+
+### Install Realsense : 
+```bash
+# install realsense in ros
+sudo apt-get install ros-$YOUR_ROS_VERSION$-realsense2-camera
+# install decription and gazebo plugin 
+# source : https://github.com/intel-ros/realsense/
+cd ~/catkin_ws
+catkin build realsense2_description
+catkin build realsense_gazebo_plugin
+
 ```
 
 ###### Clone this repository

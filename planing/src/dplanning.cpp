@@ -20,8 +20,8 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 
 void DPlanning::run(){
 	if (endpoint_active){
-		ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
-		if (distance(d_local_position,endpoint_pos_ENU) < 0.5){
+		if (distance(d_local_position,endpoint_pos_ENU) < 0.3){
+			ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
 			endpoint_active = false;
 			ROS_INFO("Finished.");
 			removeVisualize();
@@ -160,18 +160,15 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 	if (!endpoint_active){
 		endpoint_active = true;
 		endpoint_pos_ENU = *msg;	
-		ROS_INFO("Requested trajectory start (x,y,z) : %f %f %f, stop: %f %f %f",
+		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
 
 		start_time = ros::Time::now();
 		startpoint_pos_ENU = d_local_position;
-
 		publishVisualize();
 	}
 }
-
-
 
 
 
