@@ -17,6 +17,7 @@ class PlanningClient
     ros::Subscriber state_sub;
     ros::Subscriber local_pos_sub;
     ros::Subscriber global_pos_sub;
+    ros::Subscriber local_octomap_sub;
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;

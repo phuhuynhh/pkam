@@ -26,6 +26,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planing);
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
+	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
 
 	//For Planning process
 	/**
