@@ -53,4 +53,6 @@ void PlanningClient::init(DPlanning *const drone_planing){
 //Not need spinOnce() in here, in planning_node already had.
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){
 	setpoint_pos_pub.publish(setpoint_pos_ENU);
+	ROS_INFO("PUBLISH NEXT POSITION : \n pos (x,y,z) : %f %f %f",
+		 setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
 }

@@ -47,10 +47,10 @@
     //fast access to the ocupancy node
     std::vector<int> occupied_nodes;
 
-    std::set<int> all_occupied_nodes;
-    std::set<int> temp_occupied_nodes;
     std::set<int> new_free_nodes;
     std::set<int> new_occupied_nodes;
+    std::set<int> all_occupied_nodes;
+    std::set<int> temp_occupied_nodes;
     Grid3D(
       int x,
       int y,

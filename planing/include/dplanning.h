@@ -24,6 +24,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <std_srvs/SetBool.h>
@@ -87,7 +88,7 @@ public:
 	void run();
 
 private:
-	std::string m_worldFrameId = "map";
+	std::string m_worldFrameId = "/map";
 	PLANNING_TYPE planning_type = PLANNING_TYPE::SIMPLE;
 	PlanningClient *ros_client;
 
@@ -105,11 +106,12 @@ private:
 	geometry_msgs::PoseStamped setpoint_pos_ENU;
 	geometry_msgs::PoseStamped startpoint_pos_ENU;
 	geometry_msgs::PoseStamped endpoint_pos_ENU; //
+	sensor_msgs::PointCloud2 octomap_cloud;
 
 	// Target_position
 	ros::Time start_time;
 
-
+	ros::Time pre_time;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

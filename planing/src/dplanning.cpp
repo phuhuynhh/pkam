@@ -7,6 +7,13 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <sensor_msgs/PointCloud2.h>
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/conversions.h>
+#include <pcl_ros/transforms.h>
 
 
 DPlanning::DPlanning(PlanningClient * ros_client){
@@ -21,6 +28,54 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 }
 
 void DPlanning::run(){
+	//update the grid
+	tf::TransformListener m_tfListener;
+
+  pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+  pcl::fromROSMsg(octomap_cloud,temp_cloud);
+
+	visualization_msgs::MarkerArray mkarr;
+
+	tf::StampedTransform sensorToWorldTf;
+	try {
+		m_tfListener.lookupTransform(m_worldFrameId, this->octomap_cloud.header.frame_id, this->octomap_cloud.header.stamp, sensorToWorldTf);
+	} catch(tf::TransformException& ex){
+		ROS_ERROR_STREAM( "Transform error of sensor data: " << ex.what() << ", quitting callback");
+		return;
+	}
+
+	Eigen::Matrix4f sensorToWorld;
+	pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
+	pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
+
+	this->grid.insertOctomapCloud(temp_cloud);
+
+	// int marr_index = 0;
+	// int index = 0;
+	// for(std::vector<int>::const_iterator it = this->grid.occupied_nodes.begin(); it != this->grid.occupied_nodes.end(); ++it){
+	// 	if(*it == 1){
+	// 		octomap::point3d position = this->grid.toPosition(index);
+	// 		visualization_msgs::Marker mk;
+	// 		mk.id = marr_index;
+	// 		mk.type = mk.CUBE;
+	// 		marr_index += 1;
+	// 		mk.header.frame_id = "map";
+	// 		mk.pose.position.x = position.x();
+	// 		mk.pose.position.y = position.y();
+	// 		mk.pose.position.z = position.z();
+	// 		mk.color.r = 1.0;
+	// 		mk.color.a = 1.0;
+	// 		mk.color.g = 0.0;
+	// 		mk.color.b = 0.0;
+	// 		mk.scale.x = 0.2;
+	// 		mk.scale.y = 0.2;
+	// 		mk.scale.z = 0.2;
+	// 		mkarr.markers.push_back(mk);
+	// 	}
+	// 	index++;
+	// }
+	// this->ros_client->grid_pub.publish(mkarr);
+
 	if (endpoint_active){
 		if (distance(d_local_position,endpoint_pos_ENU) < 0.3){
 			ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
@@ -29,15 +84,15 @@ void DPlanning::run(){
 			removeVisualize();
 			this->planning_type = PLANNING_TYPE::POTENTIAL_FIELD;
 		}
-		double dt= ros::Time::now().toSec() - start_time.toSec();
-
+		double dt = ros::Time::now().toSec() - pre_time.toSec();
+		pre_time = ros::Time::now();
 		switch(this->planning_type){
 			case PLANNING_TYPE::SIMPLE:
 			{
 				geometry_msgs::Point start, end;
-				start.x = startpoint_pos_ENU.pose.position.x;
-				start.y = startpoint_pos_ENU.pose.position.y;
-				start.z = startpoint_pos_ENU.pose.position.z;
+				start.x = d_local_position.pose.position.x;
+				start.y = d_local_position.pose.position.y;
+				start.z = d_local_position.pose.position.z;
 
 				end.x = endpoint_pos_ENU.pose.position.x;
 				end.y = endpoint_pos_ENU.pose.position.y;
@@ -46,33 +101,94 @@ void DPlanning::run(){
 				points.points.push_back(start);
 				line_strip.points.push_back(start);
 
-				float stamped = distance(startpoint_pos_ENU, endpoint_pos_ENU) / 0.2f;
+				float stamped = distance(d_local_position, endpoint_pos_ENU)/0.5;
 
-				vx = std::abs(end.x - start.x) / stamped;
-				vy = std::abs(end.y - start.y) / stamped;
-				vz = std::abs(end.z - start.z) / stamped;
+				vx = (end.x - (float)d_local_position.pose.position.x) / stamped;
+				vy = (end.y - (float)d_local_position.pose.position.y) / stamped;
+				vz = (end.z - (float)d_local_position.pose.position.z) / stamped;
 
-				setpoint_pos_ENU.pose.position.x = startpoint_pos_ENU.pose.position.x + vx * dt;
-				setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + vy * dt;
-				setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + vz * dt;
+				setpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x + vx;
+				setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + vy;
+				setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + vz;
 
-				publishVisualize();
+				// publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
+
+				// visualization_msgs::MarkerArray mkarr;
+				// std::vector<int> neighbor;
+				// int aindex = this->grid.toIndex((float)d_local_position.pose.position.x,
+				// (float)d_local_position.pose.position.y,
+				// (float)d_local_position.pose.position.z);
+				// this->grid.getNeighborIndex(aindex, neighbor, 0.6);
+				// int marr_index = 0;
+				// for(std::vector<int>::const_iterator it = neighbor.begin(); it != neighbor.end(); ++it){
+				// 	octomap::point3d position = this->grid.toPosition(*it);
+				// 	visualization_msgs::Marker mk;
+				// 	mk.id = marr_index;
+				// 	mk.type = mk.CUBE;
+				// 	marr_index += 1;
+				// 	mk.header.frame_id = "map";
+				// 	mk.pose.position.x = position.x();
+				// 	mk.pose.position.y = position.y();
+				// 	mk.pose.position.z = position.z();
+				// 	mk.color.r = 1.0;
+				// 	mk.color.a = 1.0;
+				// 	mk.color.g = 0.0;
+				// 	mk.color.b = 0.0;
+				// 	mk.scale.x = 0.2;
+				// 	mk.scale.y = 0.2;
+				// 	mk.scale.z = 0.2;
+				// 	mkarr.markers.push_back(mk);
+				// }
+				// this->ros_client->grid_pub.publish(mkarr);
+
 				break;
 			}
 			case PLANNING_TYPE::POTENTIAL_FIELD:
 			{
 				octomap::point3d v = this->apf.calculate_velocity(
-					octomap::point3d(startpoint_pos_ENU.pose.position.x, startpoint_pos_ENU.pose.position.y, startpoint_pos_ENU.pose.position.z),
+					octomap::point3d(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z),
 					octomap::point3d(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z)
 				);
 
-				setpoint_pos_ENU.pose.position.x = startpoint_pos_ENU.pose.position.x + v.x() * dt;
-				setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + v.y() * dt;
-				setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + v.z() * dt;
+				setpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x + v.x();
+				setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + v.y();
+				setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + v.z();
 
 				// publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
+
+				// visualization_msgs::MarkerArray mkarr;
+				// std::vector<int> neighbor;
+				// int aindex = this->grid.toIndex(
+				// 	(float)d_local_position.pose.position.x,
+				// 	(float)d_local_position.pose.position.y,
+				// 	(float)d_local_position.pose.position.z
+				// );
+				// this->grid.getNeighborIndex(aindex, neighbor, 0.6);
+				// int marr_index = 0;
+				// for(std::vector<int>::const_iterator it = neighbor.begin(); it != neighbor.end(); ++it){
+				// 	octomap::point3d position = this->grid.toPosition(*it);
+				// 	visualization_msgs::Marker mk;
+				// 	mk.id = marr_index;
+				// 	mk.type = mk.CUBE;
+				// 	marr_index += 1;
+				// 	mk.header.frame_id = "map";
+				// 	mk.pose.position.x = position.x();
+				// 	mk.pose.position.y = position.y();
+				// 	mk.pose.position.z = position.z();
+				// 	mk.color.r = 1.0;
+				// 	mk.color.a = 1.0;
+				// 	mk.color.g = 0.0;
+				// 	mk.color.b = 0.0;
+				// 	mk.scale.x = 0.2;
+				// 	mk.scale.y = 0.2;
+				// 	mk.scale.z = 0.2;
+				// 	mkarr.markers.push_back(mk);
+				// }
+				// this->ros_client->grid_pub.publish(mkarr);
+
+				break;
 			}
 		}
 	}
@@ -121,7 +237,7 @@ void DPlanning::publishVisualize(){
 	points.points.push_back(start);
 	line_strip.points.push_back(start);
 
-	float stamped = distance(startpoint_pos_ENU, endpoint_pos_ENU) / 0.2f;
+	float stamped = distance(startpoint_pos_ENU, endpoint_pos_ENU) / 5.0;
 
 	vx = std::abs(end.x - start.x) / stamped;
 	vy = std::abs(end.y - start.y) / stamped;
@@ -207,6 +323,7 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
 
 		start_time = ros::Time::now();
+		pre_time = ros::Time::now();
 		startpoint_pos_ENU = d_local_position;
 
 
@@ -216,49 +333,7 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 }
 
 void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
-	    tf::TransformListener m_tfListener;
-
-	    pcl::PointCloud<pcl::PointXYZ> pc;
-	    pcl::fromROSMsg(*msg, pc);
-
-	    visualization_msgs::MarkerArray mkarr;
-
-	    tf::StampedTransform sensorToWorldTf;
-	    try {
-	      m_tfListener.lookupTransform(m_worldFrameId, msg->header.frame_id, msg->header.stamp, sensorToWorldTf);
-	    } catch(tf::TransformException& ex){
-	      ROS_ERROR_STREAM( "Transform error of sensor data: " << ex.what() << ", quitting callback");
-	      return;
-	    }
-
-	    Eigen::Matrix4f sensorToWorld;
-	    pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
-	    pcl::transformPointCloud(pc, pc, sensorToWorld);
-
-	    this->grid.insertOctomapCloud(pc);
-
-	    int marr_index = 0;
-
-	    for(std::set<int>::const_iterator it = grid.all_occupied_nodes.begin(); it != grid.all_occupied_nodes.end(); ++it){
-	      octomap::point3d position = grid.toPosition(*it);
-	      visualization_msgs::Marker mk;
-	      mk.id = marr_index;
-	      mk.type = mk.CUBE;
-	      marr_index += 1;
-	      mk.header.frame_id = "map";
-	      mk.pose.position.x = position.x();
-	      mk.pose.position.y = position.y();
-	      mk.pose.position.z = position.z();
-	      mk.color.r = 1.0;
-	      mk.color.a = 1.0;
-				mk.color.g = 0.0;
-				mk.color.b = 0.0;
-	      mk.scale.x = 0.2;
-	      mk.scale.y = 0.2;
-	      mk.scale.z = 0.2;
-	      mkarr.markers.push_back(mk);
-	    }
-	    this->ros_client.grid_pub.publish(mkarr);
+	this->octomap_cloud = *msg;
 }
 
 
