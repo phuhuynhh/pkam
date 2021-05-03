@@ -17,11 +17,14 @@ class PlanningClient
     ros::Subscriber state_sub;
     ros::Subscriber local_pos_sub;
     ros::Subscriber global_pos_sub;
+    ros::Subscriber local_octomap_sub;
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
     // pulbic point to move
     ros::Publisher setpoint_pos_pub;
+
+    ros::Publisher grid_pub;
 
     ros::Publisher traj_marker_pub;
 

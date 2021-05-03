@@ -4,17 +4,31 @@ project(dplanning)
 add_compile_options(-std=c++11)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(catkin REQUIRED COMPONENTS
+set(PACKAGE_DEPENDENCIES
   mavros
   mavros_msgs
-  roscpp
+  octomap_msgs
   tf
+  pcl_conversions
+  pcl_msgs
+  pcl_ros
+  roscpp
+  rospy
+  sensor_msgs
+  std_msgs
+  geometry_msgs
+  octomap_ros
+  visualization_msgs
+)
+
+find_package(catkin REQUIRED COMPONENTS
+  ${PACKAGE_DEPENDENCIES}
 )
 
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES planning
- CATKIN_DEPENDS mavros mavros_msgs roscpp rospy tf
+ CATKIN_DEPENDS ${PACKAGE_DEPENDENCIES}
 #  DEPENDS system_lib
 )
 
@@ -41,5 +55,14 @@ include_directories(
   	${catkin_INCLUDE_DIRS}
 )
 
-add_executable(dplanning src/planning_node.cpp src/dplanning.cpp src/planning_client.cpp)
+set( EXECUTABLE_SRC
+src/planning_node.cpp
+src/dplanning.cpp
+src/planning_client.cpp
+src/grid/Grid3D.cpp
+src/grid/Node.cpp
+src/path_planning/APF.cpp
+)
+
+add_executable(dplanning ${EXECUTABLE_SRC})
 target_link_libraries(dplanning ${catkin_LIBRARIES})

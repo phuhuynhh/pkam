@@ -10,7 +10,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <std_msgs/String.h>
 #include <visualization_msgs/Marker.h>
-
+#include <visualization_msgs/MarkerArray.h>
 
 PlanningClient::PlanningClient(int &argc, char **argv)
 {
@@ -26,6 +26,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planing);
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
+	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
 
 	//For Planning process
 	/**
@@ -42,6 +43,8 @@ void PlanningClient::init(DPlanning *const drone_planing){
 
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
+
+	grid_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
 
 	traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning_trajectory", 0);
 

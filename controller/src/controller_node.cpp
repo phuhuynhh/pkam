@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 	//Create Client & Controller and init().
 	ControlClient ros_client(argc, argv);
 
-	
+
 	DController drone_control(&ros_client, rate);
 
 	drone_control.init();
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 				break;
 		}
 
-		//Public setpoint_pos_ENU to MAVROS. 
+		//Public setpoint_pos_ENU to MAVROS.
 		drone_control.public_local_position();
 		ros::spinOnce();
 		rate->sleep();
