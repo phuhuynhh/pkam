@@ -10,7 +10,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <std_msgs/String.h>
 #include <visualization_msgs/Marker.h>
-
+#include <visualization_msgs/MarkerArray.h>
 
 PlanningClient::PlanningClient(int &argc, char **argv)
 {
@@ -43,6 +43,8 @@ void PlanningClient::init(DPlanning *const drone_planing){
 
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
+
+	grid_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
 
 	traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning_trajectory", 0);
 

@@ -7,10 +7,10 @@
 
 class APF{
 private:
-  float max_vel = 1.0;
+  float max_vel = 0.2;
   float k_att = 1.0;
-  float n_rep = 1.0;
-  float radius = 1.0;
+  float n_rep = 4.0;
+  float radius = 2.0;
   Grid3D* grid;
 public:
   APF(Grid3D* grid){

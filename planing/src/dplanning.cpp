@@ -236,27 +236,29 @@ void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
 	    pcl::transformPointCloud(pc, pc, sensorToWorld);
 
 	    this->grid.insertOctomapCloud(pc);
-	    // int marr_index = 0;
-			//
-	    // for(std::set<int>::const_iterator it = grid.all_occupied_nodes.begin(); it != grid.all_occupied_nodes.end(); ++it){
-	    //   octomap::point3d position = grid.toPosition(*it);
-	    //   visualization_msgs::Marker mk;
-	    //   mk.id = marr_index;
-	    //   mk.type = mk.CUBE;
-	    //   marr_index += 1;
-	    //   mk.header.frame_id = "map";
-	    //   mk.pose.position.x = position.x();
-	    //   mk.pose.position.y = position.y();
-	    //   mk.pose.position.z = position.z();
-	    //   mk.color.r = 1.0;
-	    //   mk.color.a = 1.0;
-	    //   mk.scale.x = 0.2;
-	    //   mk.scale.y = 0.2;
-	    //   mk.scale.z = 0.2;
-	    //   mkarr.markers.push_back(mk);
-	    // }
-	    // pub.publish(mkarr);
 
+	    int marr_index = 0;
+
+	    for(std::set<int>::const_iterator it = grid.all_occupied_nodes.begin(); it != grid.all_occupied_nodes.end(); ++it){
+	      octomap::point3d position = grid.toPosition(*it);
+	      visualization_msgs::Marker mk;
+	      mk.id = marr_index;
+	      mk.type = mk.CUBE;
+	      marr_index += 1;
+	      mk.header.frame_id = "map";
+	      mk.pose.position.x = position.x();
+	      mk.pose.position.y = position.y();
+	      mk.pose.position.z = position.z();
+	      mk.color.r = 1.0;
+	      mk.color.a = 1.0;
+				mk.color.g = 0.0;
+				mk.color.b = 0.0;
+	      mk.scale.x = 0.2;
+	      mk.scale.y = 0.2;
+	      mk.scale.z = 0.2;
+	      mkarr.markers.push_back(mk);
+	    }
+	    this->ros_client.grid_pub.publish(mkarr);
 }
 
 

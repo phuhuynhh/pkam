@@ -366,7 +366,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
   void Grid3D::getNeighborIndex(const int &index, std::vector<int> &neighbor,const float& radius){
     neighbor.clear();
-    int rad = static_cast<int>(radius/this->resolution);
+    int rad = round(radius/this->resolution);
     for(int i = -rad; i < rad + 1; i++){
       for(int j = -rad; j < rad + 1; j++){
         for(int k = -rad; k < rad + 1; k++){

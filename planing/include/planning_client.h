@@ -24,6 +24,8 @@ class PlanningClient
     // pulbic point to move
     ros::Publisher setpoint_pos_pub;
 
+    ros::Publisher grid_pub;
+
     ros::Publisher traj_marker_pub;
 
 

@@ -16,9 +16,9 @@ octomap::point3d APF::calculate_velocity(octomap::point3d q, octomap::point3d q_
   this->grid->getNeighborIndex(currentIndex, neighbor, this->radius);
   for(std::vector<int>::const_iterator it = neighbor.begin(); it != neighbor.end(); ++it){
     if(this->grid->isOccupied(*it)){
-      float dis = q.distance(q_end);
-      dis = pow(dis, this->n_rep)*this->n_rep;
-      octomap::point3d repu = this->grid->toPosition(*it) - q;
+      float dis = q.distance(this->grid->toPosition(*it));
+      dis = pow(dis, this->n_rep)/this->n_rep;
+      octomap::point3d repu = q - this->grid->toPosition(*it);
       repu = repu*dis;
       result = result + repu;
     }
