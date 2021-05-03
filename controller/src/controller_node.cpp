@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 	//Create Client & Controller and init().
 	ControlClient ros_client(argc, argv);
 
-	
+
 	DController drone_control(&ros_client, rate);
 
 	drone_control.init();
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case (DController::MISSION_STATE::COMMAND):
-					drone_control.flyToLocal(5,0,2.5); // (5,5,3) was a test case for A*
+					drone_control.flyToLocal(5,4,2.5); // (5,5,3) was a test case for A*
 				if (drone_control.is_mission_finished()){
 					drone_control.mission_state  = DController::MISSION_STATE::LAND;
 				}
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 				break;
 		}
 
-		//Public setpoint_pos_ENU to MAVROS. 
+		//Public setpoint_pos_ENU to MAVROS.
 		drone_control.public_local_position();
 		ros::spinOnce();
 		rate->sleep();

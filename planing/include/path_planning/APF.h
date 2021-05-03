@@ -10,7 +10,7 @@ private:
   float max_vel = 1.0;
   float k_att = 1.0;
   float n_rep = 1.0;
-  float radius = 0.2;
+  float radius = 1.0;
   Grid3D* grid;
 public:
   APF(Grid3D* grid){

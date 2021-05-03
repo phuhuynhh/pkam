@@ -372,7 +372,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
         for(int k = -rad; k < rad + 1; k++){
           if(i == 0 && k == 0 && j == 0) continue;
           else{
-            neighbor.push_back(toIndex(i,j,k));
+            neighbor.push_back(toIndex(rad+i,rad+j,rad+k));
           }
         }
       }

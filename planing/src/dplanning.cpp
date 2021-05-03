@@ -30,7 +30,7 @@ void DPlanning::run(){
 			this->planning_type = PLANNING_TYPE::POTENTIAL_FIELD;
 		}
 		double dt= ros::Time::now().toSec() - start_time.toSec();
-		
+
 		switch(this->planning_type){
 			case PLANNING_TYPE::SIMPLE:
 			{
@@ -71,7 +71,7 @@ void DPlanning::run(){
 				setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + v.y() * dt;
 				setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + v.z() * dt;
 
-				publishVisualize();
+				// publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
 			}
 		}
