@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case (DController::MISSION_STATE::COMMAND):
-					drone_control.flyToLocal(5,0,2.5); // (5,5,3) was a test case for A*
+					drone_control.flyToLocal(-5,-5,2.5); // (5,5,3) was a test case for A*
 				if (drone_control.is_mission_finished()){
 					drone_control.mission_state  = DController::MISSION_STATE::LAND;
 				}

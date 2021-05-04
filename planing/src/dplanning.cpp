@@ -23,7 +23,7 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 void DPlanning::run(){
 	if (endpoint_active){
 		if (distance(d_local_position,endpoint_pos_ENU) < 0.3){
-			ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
+			// ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
 			endpoint_active = false;
 			ROS_INFO("Finished.");
 			removeVisualize();
@@ -56,6 +56,7 @@ void DPlanning::run(){
 				setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + vy * dt;
 				setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + vz * dt;
 
+
 				publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
 				break;
@@ -65,11 +66,66 @@ void DPlanning::run(){
 				octomap::point3d v = this->apf.calculate_velocity(
 					octomap::point3d(startpoint_pos_ENU.pose.position.x, startpoint_pos_ENU.pose.position.y, startpoint_pos_ENU.pose.position.z),
 					octomap::point3d(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z)
-				);
+					);
 
-				setpoint_pos_ENU.pose.position.x = startpoint_pos_ENU.pose.position.x + v.x() * dt;
-				setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + v.y() * dt;
-				setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + v.z() * dt;
+
+				// setpoint_pos_ENU.pose.position.x = startpoint_pos_ENU.pose.position.x + v.x() * dt;
+				// setpoint_pos_ENU.pose.position.y = startpoint_pos_ENU.pose.position.y + v.y() * dt;
+				// setpoint_pos_ENU.pose.position.z = startpoint_pos_ENU.pose.position.z + v.z() * dt;
+
+
+
+
+				tf::Point t1, t2;
+				tf::pointMsgToTF(startpoint_pos_ENU.pose.position, t1);
+				tf::pointMsgToTF(endpoint_pos_ENU.pose.position, t2);
+				// Test yaw control
+				double roll, pitch, yaw;
+				tf::Quaternion q;
+
+				tf::quaternionMsgToTF(startpoint_pos_ENU.pose.orientation, q);
+				tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+				double x,y,z,xzLen;
+				xzLen = cos(pitch);
+				x = xzLen * cos (yaw);
+				y = sin(pitch);
+				z = xzLen * sin (-yaw);
+
+
+				tf::Point d1,d2;
+				d1.setX(x);
+				d1.setY(y);
+				d1.setZ(0);
+				d1.normalize();
+				d2 = t2.normalize();
+				d1.setZ(0);
+				d2.setZ(0);
+				printf("\n currentYaw : %f ", currentYaw());
+				printf("\nAngle of (%f,%f,%f) and (%f,%f,%f) :  %f", d1.x(), d1.y(),d1.z(),d2.x(),d2.y(),d2.z(), d1.angle(d2));
+		//Calculate yaw current orientation
+				double _angle = d1.angle(d2);
+				double new_yaw = yaw + _angle;
+				printf("\n newYaw : %f \n", new_yaw);
+
+				if (_angle>=M_PI)  _angle-=2*M_PI;
+            	if (_angle<=-M_PI) _angle+=2*M_PI;
+				double stamped = _angle / 0.2f;
+				double v_yaw = _angle  / stamped;
+
+				tf::Quaternion _new_q;
+				geometry_msgs::Quaternion _new_quaternion;
+
+				_new_q.setRPY( roll, pitch, yaw + v_yaw * dt );
+				printf("new quaternion : (%f,%f,%f,%f)", _new_q.x(), _new_q.y(), _new_q.z(), _new_q.w() );
+				tf::quaternionTFToMsg(_new_q,_new_quaternion);
+
+
+
+				setpoint_pos_ENU.pose.orientation.x = _new_quaternion.x;
+				setpoint_pos_ENU.pose.orientation.y = _new_quaternion.y;
+				setpoint_pos_ENU.pose.orientation.z = _new_quaternion.z;
+				setpoint_pos_ENU.pose.orientation.w = _new_quaternion.w;
 
 				// publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
@@ -126,7 +182,7 @@ void DPlanning::publishVisualize(){
 	vx = std::abs(end.x - start.x) / stamped;
 	vy = std::abs(end.y - start.y) / stamped;
 	vz = std::abs(end.z - start.z) / stamped;
-	ROS_INFO("stamped time %f : v(x,y,z) : (%f, %f, %f)", stamped,vx,vy,vz);
+	// ROS_INFO("stamped time %f : v(x,y,z) : (%f, %f, %f)", stamped,vx,vy,vz);
 	for (int i = 0; i < (int) stamped + 1; i++){
 		geometry_msgs::Point point_stamped;
 		point_stamped.x = start.x + vx * i;
@@ -202,63 +258,84 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 	if (!endpoint_active){
 		endpoint_active = true;
 		endpoint_pos_ENU = *msg;
-		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
+		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f, yaw : %f",
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
-			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
+			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z,
+			currentYaw());
 
 		start_time = ros::Time::now();
 		startpoint_pos_ENU = d_local_position;
 
+		tf::Point t1, t2;
+		tf::pointMsgToTF(startpoint_pos_ENU.pose.position, t1);
+		tf::pointMsgToTF(endpoint_pos_ENU.pose.position, t2);
 
+		// double current_yaw = currentYaw();
 
+		// Test yaw control
+		double roll, pitch, yaw;
+		tf::Quaternion q;
+
+		tf::quaternionMsgToTF(d_local_position.pose.orientation, q);
+		tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+		double x,y,z,xzLen;
+		xzLen = cos(pitch);
+		x = xzLen * cos (yaw);
+		y = sin(pitch);
+		z = xzLen * sin (-yaw);
+
+		// double r = sqrt(x*x+y*y+z*z);
+		// double theta = atan2(y,x);
+		// double phi = atan2(sqrt(x*x+y*y),z);
 		// publishVisualize();
 	}
 }
 
 void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
-	    tf::TransformListener m_tfListener;
+	tf::TransformListener m_tfListener;
 
-	    pcl::PointCloud<pcl::PointXYZ> pc;
-	    pcl::fromROSMsg(*msg, pc);
+	pcl::PointCloud<pcl::PointXYZ> pc;
+	pcl::fromROSMsg(*msg, pc);
 
-	    visualization_msgs::MarkerArray mkarr;
+	visualization_msgs::MarkerArray mkarr;
 
-	    tf::StampedTransform sensorToWorldTf;
-	    try {
-	      m_tfListener.lookupTransform(m_worldFrameId, msg->header.frame_id, msg->header.stamp, sensorToWorldTf);
-	    } catch(tf::TransformException& ex){
-	      ROS_ERROR_STREAM( "Transform error of sensor data: " << ex.what() << ", quitting callback");
-	      return;
-	    }
+	tf::StampedTransform sensorToWorldTf;
+	try {
+		m_tfListener.lookupTransform(m_worldFrameId, msg->header.frame_id, msg->header.stamp, sensorToWorldTf);
+	} catch(tf::TransformException& ex){
+		ROS_ERROR_STREAM( "Transform error of sensor data: " << ex.what() << ", quitting callback");
+		return;
+	}
 
-	    Eigen::Matrix4f sensorToWorld;
-	    pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
-	    pcl::transformPointCloud(pc, pc, sensorToWorld);
+	Eigen::Matrix4f sensorToWorld;
+	pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
+	pcl::transformPointCloud(pc, pc, sensorToWorld);
 
-	    this->grid.insertOctomapCloud(pc);
+	this->grid.insertOctomapCloud(pc);
 
-	    int marr_index = 0;
+	int marr_index = 0;
 
-	    for(std::set<int>::const_iterator it = grid.all_occupied_nodes.begin(); it != grid.all_occupied_nodes.end(); ++it){
-	      octomap::point3d position = grid.toPosition(*it);
-	      visualization_msgs::Marker mk;
-	      mk.id = marr_index;
-	      mk.type = mk.CUBE;
-	      marr_index += 1;
-	      mk.header.frame_id = "map";
-	      mk.pose.position.x = position.x();
-	      mk.pose.position.y = position.y();
-	      mk.pose.position.z = position.z();
-	      mk.color.r = 1.0;
-	      mk.color.a = 1.0;
-				mk.color.g = 0.0;
-				mk.color.b = 0.0;
-	      mk.scale.x = 0.2;
-	      mk.scale.y = 0.2;
-	      mk.scale.z = 0.2;
-	      mkarr.markers.push_back(mk);
-	    }
-	    this->ros_client.grid_pub.publish(mkarr);
+	for(std::set<int>::const_iterator it = grid.all_occupied_nodes.begin(); it != grid.all_occupied_nodes.end(); ++it){
+		octomap::point3d position = grid.toPosition(*it);
+		visualization_msgs::Marker mk;
+		mk.id = marr_index;
+		mk.type = mk.CUBE;
+		marr_index += 1;
+		mk.header.frame_id = "map";
+		mk.pose.position.x = position.x();
+		mk.pose.position.y = position.y();
+		mk.pose.position.z = position.z();
+		mk.color.r = 1.0;
+		mk.color.a = 1.0;
+		mk.color.g = 0.0;
+		mk.color.b = 0.0;
+		mk.scale.x = 0.2;
+		mk.scale.y = 0.2;
+		mk.scale.z = 0.2;
+		mkarr.markers.push_back(mk);
+	}
+	this->ros_client->grid_pub.publish(mkarr);
 }
 
 
@@ -275,6 +352,19 @@ double DPlanning::currentYaw()
 
 	tf::quaternionMsgToTF(d_local_position.pose.orientation, q);
 	tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+	double x,y,z,xzLen;
+	xzLen = cos(pitch);
+	x = xzLen * cos (yaw);
+	y = sin(pitch);
+	z = xzLen * sin (-yaw);
+
+	double r = sqrt(x*x+y*y+z*z);
+	double theta = atan2(y,x);
+	double phi = atan2(sqrt(x*x+y*y),z);
+
+	// printf("(x,y,z) : (%f, %f, %f) \n from (yaw,pitch, len) : (%f, %f, %f) \n",x,y,z, yaw, pitch,xzLen);
+	// printf("(theta, phi, r) : (%f, %f, %f )", theta, phi ,r );
 
 	return yaw;
 }
@@ -297,6 +387,7 @@ double DPlanning::distance(const geometry_msgs::PoseStamped &p1, const geometry_
 	tf::Point t1, t2;
 	tf::pointMsgToTF(p1.pose.position, t1);
 	tf::pointMsgToTF(p2.pose.position, t2);
+
 
 	return t1.distance(t2);
 }
