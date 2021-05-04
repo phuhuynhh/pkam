@@ -19,13 +19,13 @@ octomap::point3d APF::calculate_velocity(octomap::point3d q, octomap::point3d q_
       float dis = q.distance(this->grid->toPosition(*it));
       dis = pow(dis, this->n_rep)/this->n_rep;
       octomap::point3d repu = q - this->grid->toPosition(*it);
-      repu = repu*dis;
+      repu = repu*(1/dis);
       result = result + repu;
     }
   }
 
   // cap to max velocity
-  result.normalize();
+  result = result.normalized();
   result = result * this->max_vel;
 
   return result;

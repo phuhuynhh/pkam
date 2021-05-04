@@ -78,19 +78,21 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
     new_free_nodes.clear();
     new_occupied_nodes.clear();
+
     std::set_difference(temp_occupied_nodes.begin(),
       temp_occupied_nodes.end(),
       all_occupied_nodes.begin(),
       all_occupied_nodes.end(),
-      std::inserter(new_free_nodes, new_free_nodes.end())
+      std::inserter(new_free_nodes,new_free_nodes.end())
     );
 
     std::set_difference(all_occupied_nodes.begin(),
       all_occupied_nodes.end(),
       temp_occupied_nodes.begin(),
       temp_occupied_nodes.end(),
-      std::inserter(new_occupied_nodes, new_occupied_nodes.end())
+      std::inserter(new_occupied_nodes,new_occupied_nodes.end())
     );
+    //
 
     for(std::set<int>::const_iterator it = new_free_nodes.begin(); it != new_free_nodes.end(); ++it){
       this->occupied_nodes[*it] = 0;
@@ -331,9 +333,9 @@ void Grid3D::Initilize(const octomap::point3d& origin){
   }
 
   void Grid3D::discritizePosition(const float &x, const float &y, const float &z, int &xkey, int &ykey, int &zkey){
-    xkey = round((x - corner.x())/resolution);
-    ykey = round((y - corner.y())/resolution);
-    zkey = round((z - corner.z())/resolution);
+    xkey = (int)round((x - corner.x())/resolution);
+    ykey = (int)round((y - corner.y())/resolution);
+    zkey = (int)round((z - corner.z())/resolution);
   }
 
   void Grid3D::getNeighborIndex(const int &index, std::vector<int> &neighbor){
@@ -366,14 +368,14 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
   void Grid3D::getNeighborIndex(const int &index, std::vector<int> &neighbor,const float& radius){
     neighbor.clear();
+    int x,y,z;
+    octomap::point3d pos = this->toPosition(index);
+    this->discritizePosition(pos.x(), pos.y(), pos.z(), x,y,z);
     int rad = round(radius/this->resolution);
     for(int i = -rad; i < rad + 1; i++){
       for(int j = -rad; j < rad + 1; j++){
         for(int k = -rad; k < rad + 1; k++){
-          if(i == 0 && k == 0 && j == 0) continue;
-          else{
-            neighbor.push_back(toIndex(rad+i,rad+j,rad+k));
-          }
+          neighbor.push_back(toIndex(x+i,y+j,z+k));
         }
       }
     }
@@ -434,6 +436,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
     if(!isValidIndex(index)){
       return true;
     }
+
 
     if(occupied_nodes[index] == 1){
       return true;
