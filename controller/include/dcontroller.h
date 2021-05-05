@@ -33,7 +33,7 @@
 class ControlClient;
 
 class DController {
-public:	
+public:
 
 	enum class MISSION_STATE {
 		WAIT = 0,
@@ -51,7 +51,7 @@ public:
 	DController(ControlClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
-	static constexpr float TAKEOFF_ALTITUDE = 2.5;
+	static constexpr float TAKEOFF_ALTITUDE = 1.5;
 	static constexpr int   MAX_ATTEMPTS = 300;
 	static constexpr float SAFETY_ALTITUDE_GPS = 3.0;
 	static constexpr float ROS_RATE = 20.0;
@@ -114,23 +114,23 @@ private:
 	uint8_t close_enough = 0;
 
 	// Use this param for ros_client->setpoint_pos_local_pub()
-	geometry_msgs::PoseStamped setpoint_pos_ENU; 
+	geometry_msgs::PoseStamped setpoint_pos_ENU;
 
-	// Use this param for Trajectory Generetor via : ros_client->endpoint_pos_pub() 
+	// Use this param for Trajectory Generetor via : ros_client->endpoint_pos_pub()
 	// pass to path-planning node.
 	geometry_msgs::PoseStamped endpoint_pos_ENU; //
-	geometry_msgs::PoseStamped gps_init_pos; // is needed ?? 
+	geometry_msgs::PoseStamped gps_init_pos; // is needed ??
 
 	ros::Time last_request;
 
 	mavros_msgs::SetMode offboard_setmode;
 	mavros_msgs::CommandBool arm_cmd;
 
-		
+
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);
 	double distance(const geometry_msgs::PoseStamped &p1, const geometry_msgs::PoseStamped &p2);
 };
-	
+
 
 #endif

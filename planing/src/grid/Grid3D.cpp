@@ -459,3 +459,19 @@ void Grid3D::Initilize(const octomap::point3d& origin){
       return 10e6;
     }
   }
+
+  int Grid3D::steer(const int& idx1, const int& idx2, const float& radius){
+    octomap::point3d pos1 = this->toPosition(idx1);
+    octomap::point3d pos2 = this->toPosition(idx2);
+    octomap::point3d delta = pos2 - pos1;
+    float dis = delta.norm();
+    if(dis < radius) return idx2;
+    else{
+      octomap::point3d del = pos1 + delta*(dis/radius);
+      return this->toIndex(del.x(), del.y(), del.z());
+    }
+  }
+
+  int Grid3D::uni_random(){
+    return this->random_idx(this->generator);
+  }

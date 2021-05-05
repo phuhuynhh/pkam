@@ -17,10 +17,14 @@ octomap::point3d APF::calculate_velocity(octomap::point3d q, octomap::point3d q_
   for(std::vector<int>::const_iterator it = neighbor.begin(); it != neighbor.end(); ++it){
     if(this->grid->isOccupied(*it)){
       float dis = q.distance(this->grid->toPosition(*it));
-      dis = pow(dis, this->n_rep)/this->n_rep;
-      octomap::point3d repu = q - this->grid->toPosition(*it);
-      repu = repu*(1/dis);
-      result = result + repu;
+      if(dis >= this->radius ){
+        continue;
+      }
+      else{
+        octomap::point3d repu = q - this->grid->toPosition(*it);
+        repu = repu*pow((1/dis - 1/this->radius), this->n_rep)*k_rep;
+        result = result + repu;
+      }
     }
   }
 

@@ -101,7 +101,7 @@ void DPlanning::run(){
 				points.points.push_back(start);
 				line_strip.points.push_back(start);
 
-				float stamped = distance(d_local_position, endpoint_pos_ENU)/0.5;
+				float stamped = distance(d_local_position, endpoint_pos_ENU)/0.4;
 
 				vx = (end.x - (float)d_local_position.pose.position.x) / stamped;
 				vy = (end.y - (float)d_local_position.pose.position.y) / stamped;

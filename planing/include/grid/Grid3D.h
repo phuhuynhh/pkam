@@ -6,6 +6,8 @@
 #include <vector>
 #include <set>
 #include <unordered_map>
+#include <random>
+
 #include "grid/Node.h"
 #include "grid/Edge.h"
 
@@ -51,6 +53,9 @@
     std::set<int> new_occupied_nodes;
     std::set<int> all_occupied_nodes;
     std::set<int> temp_occupied_nodes;
+
+    std::default_random_engine generator;
+    std::uniform_int_distribution<int> random_idx;
     Grid3D(
       int x,
       int y,
@@ -64,6 +69,7 @@
       this->sizeZ = z;
 
       occupied_nodes.resize(x*y*z, 0);
+      random_idx = std::uniform_int_distribution<int>(0, x*y*z-1);
     }
 
     void Initilize(const octomap::point3d& origin);
@@ -104,6 +110,11 @@
 
     int getCost(const int& idx1, const int& idx2);
 
+    //return the index of the current position close to idx1 on ray to idx2
+    int steer(const int& idx1, const int& idx2,const float& radius);
+
+    //randomly pick an index on uniform distribution
+    int uni_random();
   };
 
 

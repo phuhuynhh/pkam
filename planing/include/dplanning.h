@@ -39,7 +39,7 @@ public:
 
 	// all the steering and path planning work with this grid
 	// this data structure take octomap as input and create ready to use grid
-	Grid3D grid = Grid3D(400, 400, 400, 0.2);
+	Grid3D grid = Grid3D(400, 400, 400, 0.4);
 	APF apf = APF(&grid);
 
 	enum class PLANNING_TYPE {
@@ -56,7 +56,7 @@ public:
 	DPlanning(PlanningClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
-	static constexpr float ROS_RATE = 20.0;
+	static constexpr float ROS_RATE = 30.0;
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	ros::Rate *rate_;

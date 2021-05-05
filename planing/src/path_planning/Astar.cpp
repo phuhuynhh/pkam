@@ -41,10 +41,12 @@ bool Astar::find_path(const octomap::point3d& start_point,
 
     for(std::vector<int>::const_iterator it = expand.begin(); it != expand.end(); ++it){
       extend_id((size_t)(*it));
+      node_map[*it].setIndex(*it);
       node_map[*it].setH(grid->getCost(*it, end_idx));
       int newG = node_map[top_key].getG() + static_cast<int>(grid->resolution*1000);
 
       if(node_map[*it].getG() > newG){
+        node_map[*it].setParent(&node_map[top_key])
         node_map[*it].setG(newG);
         queue.update(*it, newG + node_map[*it].getH(), false);
         pre_node_map[*it] = top_key;

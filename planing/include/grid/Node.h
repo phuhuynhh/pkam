@@ -2,7 +2,7 @@
 #define NODE_H
 
 #include "grid/Node.h"
-
+#include <vector>
   class Grid3D;
   class Node{
   private:
@@ -71,7 +71,6 @@
     inline bool getOccupancy(){
       return occupancy;
     }
-
     void ChangeOccupancy(bool value);
   };
 
