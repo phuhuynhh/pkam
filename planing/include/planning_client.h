@@ -14,6 +14,7 @@ class PlanningClient
     PlanningClient(int &argc, char **argv);
     PlanningClient(int &argc, char **argv, ros::NodeHandle *node_handle);
 
+
     ros::Subscriber state_sub;
     ros::Subscriber local_pos_sub;
     ros::Subscriber global_pos_sub;
@@ -21,18 +22,21 @@ class PlanningClient
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
+
     // pulbic point to move
     ros::Publisher setpoint_pos_pub;
 
-    ros::Publisher grid_pub;
+    // Visualize Marker Public.
+    ros::Publisher grid_marker_pub;
+    ros::Publisher global_traj_marker_pub;
+    ros::Publisher vel_marker_pub;
 
-    ros::Publisher traj_marker_pub;
-
-
-
-    void init(DPlanning *const drone_planning);
 
     DPlanning *drone_planning;
+    void init(DPlanning *const drone_planning);
+
+    
+
 
     void create_status_timer();
     void publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU);

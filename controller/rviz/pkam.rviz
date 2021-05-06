@@ -8,8 +8,14 @@ Panels:
         - /MAVROS1/local_pose1
         - /MAP1
         - /MAP1/global_octomap1
+        - /PATH1
+        - /PATH1/Trajector1
+        - /PATH1/Trajector1/Status1
         - /TF1
         - /TF1/Frames1
+        - /TF1/Tree1
+        - /TF1/Tree1/map1
+        - /TF1/Tree1/map1/drone1
       Splitter Ratio: 0.5176470875740051
     Tree Height: 508
   - Class: rviz/Selection
@@ -194,8 +200,16 @@ Visualization Manager:
       Displays:
         - Class: rviz/Marker
           Enabled: true
-          Marker Topic: /planning_trajectory
-          Name: Marker
+          Marker Topic: /planning/trajectory
+          Name: Trajector
+          Namespaces:
+            {}
+          Queue Size: 100
+          Value: true
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /planning/velocity
+          Name: Velocity
           Namespaces:
             {}
           Queue Size: 100
@@ -265,7 +279,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 8.843019485473633
+      Distance: 13.914663314819336
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -280,10 +294,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.289795845746994
+      Pitch: 0.4797957241535187
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 3.1872165203094482
+      Yaw: 3.557215690612793
     Saved: ~
 Window Geometry:
   Color:

@@ -44,13 +44,17 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
 
-	grid_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
-
-	traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning_trajectory", 0);
+	// Visualizer Marker
+	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
+	global_traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/trajectory", 10);
+	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
 }
 
 //Not need spinOnce() in here, in planning_node already had.
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){
 	setpoint_pos_pub.publish(setpoint_pos_ENU);
+
+	// printf("next position (x,y,z) : (%f, %f, %f) \n", 
+	// 	setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
 }

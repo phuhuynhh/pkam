@@ -24,6 +24,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <std_srvs/SetBool.h>
@@ -42,7 +43,7 @@ public:
 	APF apf = APF(&grid);
 
 	enum class PLANNING_TYPE {
-		SIMPLE,
+		TAKE_OFF,
 		A_START,
 		RRT,
 		NEWTON_EULER,
@@ -55,6 +56,7 @@ public:
 	DPlanning(PlanningClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
+	static constexpr float DEFAULT_VELOCITY = 0.3f;
 	static constexpr float ROS_RATE = 20.0;
 
 	// The setpoint publishing rate MUST be faster than 2Hz
@@ -72,44 +74,48 @@ public:
 	// geometry_msgs::PoseStamped target_position;
 
 
-
-	void publishVisualize();
-	void removeVisualize();
+	void draw_velocitty();
+	void draw_global_trajectory();
+	void remove_global_trajectory();
 	// Subsriber Callback.
 	void state_callback(const mavros_msgs::State::ConstPtr &msg);
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
 	void get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-  void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
+	void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
 
 
 	void public_local_position();
+
 	void run();
+	void update_grid_map();
 
 private:
-	std::string m_worldFrameId = "map";
-	PLANNING_TYPE planning_type = PLANNING_TYPE::SIMPLE;
+	std::string m_worldFrameId = "/map";
+	PLANNING_TYPE planning_type = PLANNING_TYPE::TAKE_OFF;
 	PlanningClient *ros_client;
 
 	bool approaching = false;
 	bool endpoint_active = false;
+	bool octomap_activate = false;
 
-	visualization_msgs::Marker points, line_strip;
+	visualization_msgs::Marker points, velocity_vector, global_trajectory_line;
 
 
-	double vx = 0.5;
-	double vy = 0.5;
-	double vz = 0.5;
+	double vx = 0.3;
+	double vy = 0.3;
+	double vz = 0.3;
 
 	// Use this param for ros_client->setpoint_pos_local_pub()
 	geometry_msgs::PoseStamped setpoint_pos_ENU;
 	geometry_msgs::PoseStamped startpoint_pos_ENU;
 	geometry_msgs::PoseStamped endpoint_pos_ENU; //
+	sensor_msgs::PointCloud2 octomap_cloud;
 
 	// Target_position
 	ros::Time start_time;
 
-
+	ros::Time pre_time;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

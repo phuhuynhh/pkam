@@ -51,7 +51,7 @@ public:
 	DController(ControlClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
-	static constexpr float TAKEOFF_ALTITUDE = 2.5;
+	static constexpr float TAKEOFF_ALTITUDE = 1.25;
 	static constexpr int   MAX_ATTEMPTS = 300;
 	static constexpr float SAFETY_ALTITUDE_GPS = 3.0;
 	static constexpr float ROS_RATE = 20.0;

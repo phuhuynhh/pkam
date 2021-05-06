@@ -64,7 +64,7 @@ void DController::run(){
 }
 
 bool DController::is_mission_finished(){
-	if (distance(d_local_position, endpoint_pos_ENU) < 0.5){
+	if (distance(d_local_position, endpoint_pos_ENU) < 0.2f){
 		setpoint_pos_ENU = endpoint_pos_ENU;
 		return true;
 	}
