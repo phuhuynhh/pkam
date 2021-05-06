@@ -46,22 +46,11 @@ void DPlanning::run(){
 		switch(this->planning_type){
 			case PLANNING_TYPE::TAKE_OFF:
 			{
+				float stamped = distance(d_local_position, endpoint_pos_ENU) / 0.5;
 
-				geometry_msgs::Point start, end;
-				start.x = d_local_position.pose.position.x;
-				start.y = d_local_position.pose.position.y;
-				start.z = d_local_position.pose.position.z;
-
-				end.x = endpoint_pos_ENU.pose.position.x;
-				end.y = endpoint_pos_ENU.pose.position.y;
-				end.z = endpoint_pos_ENU.pose.position.z;
-
-
-				float stamped = distance(d_local_position, endpoint_pos_ENU)/0.5;
-
-				vx = (endpoint_pos_ENU.pose.position.x - (float)d_local_position.pose.position.x) / stamped;
-				vy = (endpoint_pos_ENU.pose.position.y - (float)d_local_position.pose.position.y) / stamped;
-				vz = (endpoint_pos_ENU.pose.position.z - (float)d_local_position.pose.position.z) / stamped;
+				vx = (float)(endpoint_pos_ENU.pose.position.x - (float)d_local_position.pose.position.x) / stamped;
+				vy = (float)(endpoint_pos_ENU.pose.position.y - (float)d_local_position.pose.position.y) / stamped;
+				vz = (float)(endpoint_pos_ENU.pose.position.z - (float)d_local_position.pose.position.z) / stamped;
 
 				setpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x + vx;
 				setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + vy;
@@ -97,7 +86,7 @@ void DPlanning::run(){
 			}
 		}
 
-		printf("velocity : (%f, %f, %f)\n", vx, vy, vz);
+		// printf("velocity : (%f, %f, %f)\n", vx, vy, vz);
 		draw_velocitty();
 
 	}
@@ -341,6 +330,53 @@ void drawPoint(){
 	ros_client->global_traj_marker_pub.publish(points);
 }
 
+*/
+
+/*
+
+tf::Point t1, t2;
+				tf::pointMsgToTF(startpoint_pos_ENU.pose.position, t1);
+				tf::pointMsgToTF(endpoint_pos_ENU.pose.position, t2);
+				// Test yaw control
+				double roll, pitch, yaw;
+				tf::Quaternion q;
+
+				tf::quaternionMsgToTF(startpoint_pos_ENU.pose.orientation, q);
+				tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+				double x,y,z,xzLen;
+				xzLen = cos(pitch);
+				x = xzLen * cos (yaw);
+				y = sin(pitch);
+				z = xzLen * sin (-yaw);
+
+
+				tf::Point d1,d2;
+				d1.setX(x);
+				d1.setY(y);
+				d1.setZ(0);
+				d1.normalize();
+				d2 = t2.normalize();
+				d1.setZ(0);
+				d2.setZ(0);
+				printf("\n currentYaw : %f ", currentYaw());
+				printf("\nAngle of (%f,%f,%f) and (%f,%f,%f) :  %f", d1.x(), d1.y(),d1.z(),d2.x(),d2.y(),d2.z(), d1.angle(d2));
+		//Calculate yaw current orientation
+				double _angle = d1.angle(d2);
+				double new_yaw = yaw + _angle;
+				printf("\n newYaw : %f \n", new_yaw);
+
+				if (_angle>=M_PI)  _angle-=2*M_PI;
+            	if (_angle<=-M_PI) _angle+=2*M_PI;
+				double stamped = _angle / 0.2f;
+				double v_yaw = _angle  / stamped;
+
+				tf::Quaternion _new_q;
+				geometry_msgs::Quaternion _new_quaternion;
+
+				_new_q.setRPY( roll, pitch, yaw + v_yaw * dt );
+				printf("new quaternion : (%f,%f,%f,%f)", _new_q.x(), _new_q.y(), _new_q.z(), _new_q.w() );
+				tf::quaternionTFToMsg(_new_q,_new_quaternion);
 */
 
 

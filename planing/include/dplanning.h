@@ -39,7 +39,7 @@ public:
 
 	// all the steering and path planning work with this grid
 	// this data structure take octomap as input and create ready to use grid
-	Grid3D grid = Grid3D(400, 400, 400, 0.2);
+	Grid3D grid = Grid3D(400, 400, 400, 0.4);
 	APF apf = APF(&grid);
 
 	enum class PLANNING_TYPE {
@@ -57,7 +57,7 @@ public:
 
 	static constexpr bool  KEEP_ALIVE = true;
 	static constexpr float DEFAULT_VELOCITY = 0.3f;
-	static constexpr float ROS_RATE = 20.0;
+	static constexpr float ROS_RATE = 30.0;
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	ros::Rate *rate_;
@@ -74,6 +74,7 @@ public:
 	// geometry_msgs::PoseStamped target_position;
 
 
+
 	void draw_velocitty();
 	void draw_global_trajectory();
 	void remove_global_trajectory();
@@ -82,11 +83,10 @@ public:
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
 	void get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-	void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
+  void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
 
 
 	void public_local_position();
-
 	void run();
 	void update_grid_map();
 
@@ -102,9 +102,9 @@ private:
 	visualization_msgs::Marker points, velocity_vector, global_trajectory_line;
 
 
-	double vx = 0.3;
-	double vy = 0.3;
-	double vz = 0.3;
+	double vx = 0.5;
+	double vy = 0.5;
+	double vz = 0.5;
 
 	// Use this param for ros_client->setpoint_pos_local_pub()
 	geometry_msgs::PoseStamped setpoint_pos_ENU;

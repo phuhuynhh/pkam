@@ -32,6 +32,7 @@ class PlanningClient
     ros::Publisher vel_marker_pub;
 
 
+
     DPlanning *drone_planning;
     void init(DPlanning *const drone_planning);
 
@@ -40,7 +41,7 @@ class PlanningClient
 
     void create_status_timer();
     void publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU);
-    void publishVisualize();
+    void draw_global_trajectory();
     void setParam(const std::string &key, double d);
     bool avoidCollision_ = true;
 

@@ -40,7 +40,6 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	*/
 	getpoint_target_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, &DPlanning::get_target_position_callback, drone_planing);
 
-
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
 
@@ -55,6 +54,6 @@ void PlanningClient::init(DPlanning *const drone_planing){
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){
 	setpoint_pos_pub.publish(setpoint_pos_ENU);
 
-	// printf("next position (x,y,z) : (%f, %f, %f) \n", 
-	// 	setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
+	printf("next position (x,y,z) : (%f, %f, %f) \n", 
+		setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
 }
