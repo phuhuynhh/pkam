@@ -43,7 +43,7 @@ public:
 	APF apf = APF(&grid);
 
 	enum class PLANNING_TYPE {
-		SIMPLE,
+		TAKE_OFF,
 		A_START,
 		RRT,
 		NEWTON_EULER,
@@ -56,7 +56,8 @@ public:
 	DPlanning(PlanningClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
-	static constexpr float ROS_RATE = 30.0;
+	static constexpr float DEFAULT_VELOCITY = 0.3f;
+	static constexpr float ROS_RATE = 20.0;
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	ros::Rate *rate_;
@@ -74,8 +75,9 @@ public:
 
 
 
-	void publishVisualize();
-	void removeVisualize();
+	void draw_velocitty();
+	void draw_global_trajectory();
+	void remove_global_trajectory();
 	// Subsriber Callback.
 	void state_callback(const mavros_msgs::State::ConstPtr &msg);
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
@@ -86,16 +88,18 @@ public:
 
 	void public_local_position();
 	void run();
+	void update_grid_map();
 
 private:
 	std::string m_worldFrameId = "/map";
-	PLANNING_TYPE planning_type = PLANNING_TYPE::SIMPLE;
+	PLANNING_TYPE planning_type = PLANNING_TYPE::TAKE_OFF;
 	PlanningClient *ros_client;
 
 	bool approaching = false;
 	bool endpoint_active = false;
+	bool octomap_activate = false;
 
-	visualization_msgs::Marker points, line_strip;
+	visualization_msgs::Marker points, velocity_vector, global_trajectory_line;
 
 
 	double vx = 0.5;
