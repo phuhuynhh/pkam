@@ -46,6 +46,7 @@ void DPlanning::run(){
 		switch(this->planning_type){
 			case PLANNING_TYPE::TAKE_OFF:
 			{
+
 				float stamped = distance(d_local_position, endpoint_pos_ENU) / 0.5;
 
 				vx = (float)(endpoint_pos_ENU.pose.position.x - (float)d_local_position.pose.position.x) / stamped;

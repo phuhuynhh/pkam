@@ -57,7 +57,7 @@ public:
 
 	static constexpr bool  KEEP_ALIVE = true;
 	static constexpr float DEFAULT_VELOCITY = 0.3f;
-	static constexpr float ROS_RATE = 30.0;
+	static constexpr float ROS_RATE = 20.0;
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	ros::Rate *rate_;
