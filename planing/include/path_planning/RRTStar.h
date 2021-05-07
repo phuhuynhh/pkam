@@ -20,13 +20,13 @@ private:
 public:
   Grid3D* grid;
   octomap::point3d target;
-  Octree* tree;
+  Octree* tree = nullptr;
   bool reached = false;
 
   RRTStar(Grid3D* grid,const octomap::point3d& target){
     this->grid = grid;
     this->target = target;
-    *tree = Octree(grid);
+    tree = new Octree(grid);
   };
 
   void find_path(const octomap::point3d& start_point,
@@ -39,6 +39,9 @@ public:
 
   void rewire(const int& new_index, std::vector<int>& neighbors);
 
+  ~RRTStar(){
+    delete tree;
+  }
 };
 
 #endif

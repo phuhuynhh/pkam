@@ -1,5 +1,6 @@
 #include <utility>
 #include <vector>
+#include <map>
 #ifndef UPDATABLE_PRIORITY_QUEUE_H
 #define UPDATABLE_PRIORITY_QUEUE_H
 
@@ -21,7 +22,7 @@
 	template <typename Key, typename Priority>
 		class updatable_priority_queue {
 			protected:
-				std::vector<size_t> id_to_heappos;
+				std::map<size_t, size_t> id_to_heappos;
 				std::vector<priority_queue_node<Key,Priority>> heap;
 
 			public:

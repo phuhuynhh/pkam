@@ -6,14 +6,15 @@
 #include "grid/updatable_priority_queue.h"
 #include <vector>
 #include <octomap/octomap.h>
+#include <map>
 
 class Grid3D;
 class Node;
 
 class Astar{
 private:
-  std::vector<Node> node_map;
-  std::vector<int> pre_node_map;
+  std::map<int, Node> node_map;
+  std::map<int, int> pre_node_map;
 public:
   Grid3D* grid;
   octomap::point3d target;
@@ -29,7 +30,7 @@ public:
 
   void return_path(const int& start_key, const int& end_key, std::vector<int>& node_index);
 
-  void extend_id(size_t idx);
+  void extend_id(int idx);
 
 
 };

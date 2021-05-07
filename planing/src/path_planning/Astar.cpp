@@ -3,11 +3,10 @@
 #include "grid/updatable_priority_queue.h"
 #include <algorithm>
 
-void Astar::extend_id(size_t idx){
-  size_t new_size = idx + 1;
-  if(node_map.size() < new_size){
-    node_map.resize(new_size);
-    pre_node_map.resize(new_size, -1);
+void Astar::extend_id(int idx){
+  if(node_map.find(idx) == node_map.end()){
+    node_map[idx] = Node();
+    pre_node_map[idx] = -1;
   }
 }
 
@@ -61,9 +60,7 @@ void Astar::return_path(const int& start_key, const int& end_key, std::vector<in
   node_index.clear();
   int current_key = end_key;
   while(current_key != -1 && current_key != start_key){
-    node_index.push_back(pre_node_map[current_key]);
+    node_index.insert(node_index.begin(),current_key);
     current_key = pre_node_map[current_key];
   }
-
-  std::reverse(node_index.begin(), node_index.end());
 }

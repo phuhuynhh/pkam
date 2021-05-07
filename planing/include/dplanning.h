@@ -29,22 +29,28 @@
 
 #include <std_srvs/SetBool.h>
 #include <visualization_msgs/Marker.h>
+#include "path_planning/Astar.h"
+#include <chrono>
 
 class PlanningClient;
 class Grid3D;
 class APF;
+class Astar;
 
 class DPlanning {
 public:
 
 	// all the steering and path planning work with this grid
 	// this data structure take octomap as input and create ready to use grid
-	Grid3D grid = Grid3D(400, 400, 400, 0.4);
+	Grid3D grid = Grid3D(400, 400, 400, 0.5);
 	APF apf = APF(&grid);
+	Astar* astar;
+	ros::NodeHandle* nh_;
+	int planning = 1;
 
 	enum class PLANNING_TYPE {
 		TAKE_OFF,
-		A_START,
+		ASTAR,
 		RRT,
 		NEWTON_EULER,
 		POTENTIAL_FIELD,
@@ -68,6 +74,7 @@ public:
 	//d_ ~ mean Drone message.
 	mavros_msgs::State d_current_state;
 	geometry_msgs::PoseStamped d_local_position;
+	geometry_msgs::PoseStamped d_previous_position;
 	sensor_msgs::NavSatFix d_global_position;
 
 	// Saving init pose to home.
@@ -105,6 +112,7 @@ private:
 	double vx = 0.5;
 	double vy = 0.5;
 	double vz = 0.5;
+	double travel_cost = 0.0;
 
 	// Use this param for ros_client->setpoint_pos_local_pub()
 	geometry_msgs::PoseStamped setpoint_pos_ENU;
@@ -114,8 +122,10 @@ private:
 
 	// Target_position
 	ros::Time start_time;
-
 	ros::Time pre_time;
+
+	long long worst_duration = 0;
+	long long best_duration = 100000000000000;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

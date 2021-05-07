@@ -36,7 +36,7 @@ class PlanningClient
     DPlanning *drone_planning;
     void init(DPlanning *const drone_planning);
 
-    
+
 
 
     void create_status_timer();
@@ -45,7 +45,6 @@ class PlanningClient
     void setParam(const std::string &key, double d);
     bool avoidCollision_ = true;
 
-  private:
     ros::NodeHandle *nh_;
 };
 
