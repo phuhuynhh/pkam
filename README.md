@@ -118,3 +118,12 @@ roslaunch dcontroller sitl.launch
   #by launch file 
   roslaunch dcontroller controller_and_planning.launch
 ```
+
+## Develop
+
+``` bash
+	#Use ROS_INFO in Dcontroller.
+	#And use printf in DPlanning.
+
+
+```
