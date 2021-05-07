@@ -62,6 +62,11 @@ src/planning_client.cpp
 src/grid/Grid3D.cpp
 src/grid/Node.cpp
 src/path_planning/APF.cpp
+src/tree/OctreeNode.cpp
+src/tree/Octree.cpp
+src/path_planning/RRTStar.cpp
+src/path_planning/Astar.cpp
+src/grid/updatable_priority_queue.cpp
 )
 
 add_executable(dplanning ${EXECUTABLE_SRC})

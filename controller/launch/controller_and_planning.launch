@@ -4,5 +4,7 @@
     </node>
 
     <node pkg="dplanning" type="dplanning" name="dplanning" output="screen">
+      <!-- type of path planning -->
+      <param name="planning" value="1"/>
     </node>
 </launch>

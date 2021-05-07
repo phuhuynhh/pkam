@@ -84,7 +84,7 @@
     // void HandleOccupancyChange(const int &node_index,const bool &change);
 
     //return indexs of voxel touch by the ray
-    void castRay(octomap::point3d& start, octomap::point3d& end, std::vector<int>& key_set);
+    void castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set);
 
     int toIndex(const float &x, const float &y, const float &z);
 

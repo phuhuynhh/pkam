@@ -73,15 +73,18 @@ bool updatable_priority_queue<Key, Priority>::push(const Key& key, const Priorit
 /** Returns true if the key was already inside and was updated, otherwise does nothing and returns false */
 template <typename Key, typename Priority>
 bool updatable_priority_queue<Key, Priority>::update(const Key& key, const Priority& new_priority, bool only_if_higher) {  //only_if_higher=false
-	if(key >= id_to_heappos.size()){
+	size_t new_key = key;
+	if(id_to_heappos.find(new_key) == id_to_heappos.end()){
 		push(key, new_priority, false);
 		return true;
 	}
+
 	size_t heappos = id_to_heappos[key];
 	if(heappos >= ((size_t)-2)){
 		push(key, new_priority,false);
 		return true;
 	}
+
 	Priority& priority = heap[heappos].priority;
 	if(new_priority < priority) {
 		priority = new_priority;
@@ -98,9 +101,9 @@ bool updatable_priority_queue<Key, Priority>::update(const Key& key, const Prior
 
 template <typename Key, typename Priority>
 void updatable_priority_queue<Key, Priority>::extend_ids(Key k) {
-	size_t new_size = k+1;
-	if(id_to_heappos.size() < new_size)
-		id_to_heappos.resize(new_size, -1);
+	size_t new_key = k;
+	if(id_to_heappos.find(new_key) == id_to_heappos.end())
+		id_to_heappos[new_key] = -1;
 }
 
 template <typename Key, typename Priority>
@@ -109,7 +112,7 @@ void updatable_priority_queue<Key, Priority>::sift_down(size_t heappos) {
 	size_t child = heappos*2+1;
 	if(len < 2 || child >= len) return;
 	if(child+1 < len && heap[child+1] < heap[child]) ++child; // Check whether second child is higher
-	if(!(heap[child] < heap[heappos])) return; // Already in heap order
+	if((heap[child] > heap[heappos])) return; // Already in heap order
 
 	priority_queue_node<Key,Priority> val = std::move(heap[heappos]);
 	do {
@@ -129,7 +132,8 @@ void updatable_priority_queue<Key, Priority>::sift_up(size_t heappos) {
 	size_t len = heap.size();
 	if(len < 2 || heappos <= 0) return;
 	size_t parent = (heappos-1)/2;
-	if(!(heap[heappos] < heap[parent])) return;
+	if((heap[heappos] > heap[parent])) return;
+
 	priority_queue_node<Key, Priority> val = std::move(heap[heappos]);
 	do {
 		heap[heappos] = std::move(heap[parent]);

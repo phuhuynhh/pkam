@@ -5,10 +5,11 @@
 #include <octomap/octomap.h>
 
 #include "grid/Node.h"
-#include "grid/Grid.h"
-
+#include "grid/Grid3D.h"
+#include "tree/Octree.h"
 
 class Node;
+class Octree;
 
 class RRTStar{
 private:
@@ -19,13 +20,16 @@ private:
 public:
   Grid3D* grid;
   octomap::point3d target;
+  Octree* tree = nullptr;
+  bool reached = false;
 
   RRTStar(Grid3D* grid,const octomap::point3d& target){
     this->grid = grid;
     this->target = target;
+    tree = new Octree(grid);
   };
 
-  bool find_path(const octomap::point3d& start_point,
+  void find_path(const octomap::point3d& start_point,
                         std::vector<int>& node_index,
                         const unsigned int& iteration);
 
@@ -33,6 +37,11 @@ public:
 
   void extend_id(size_t idx);
 
-}
+  void rewire(const int& new_index, std::vector<int>& neighbors);
+
+  ~RRTStar(){
+    delete tree;
+  }
+};
 
 #endif

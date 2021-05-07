@@ -17,31 +17,6 @@ void Grid3D::Initilize(const octomap::point3d& origin){
   corner.x() = origin.x()-static_cast<float>(sizeX-1)*resolution/2.0f;
   corner.y() = origin.y()-static_cast<float>(sizeY-1)*resolution/2.0f;
   corner.z() = origin.z()-static_cast<float>(sizeZ-1)*resolution/2.0f;
-
-  // node_list.resize(sizeX*sizeY*sizeZ);
-  // adjency_list.resize(sizeX*sizeY*sizeZ);
-  //
-  // for(int i = 0; i < sizeX*sizeY*sizeZ; i++){
-  //   node_list[i].setParent(this);
-  //   node_list[i].setIndex(i);
-  //   if(isValidIndex(i+1)){
-  //     Edge new_edge(&node_list[i], &node_list[i+1],static_cast<int>(resolution*1000));
-  //     adjency_list[i][i+1] = new_edge;
-  //     adjency_list[i+1][i] = new_edge;
-  //   }
-  //
-  //   if(isValidIndex(i+sizeX)){
-  //     Edge new_edge(&node_list[i], &node_list[i+sizeX],static_cast<int>(resolution*1000));
-  //     adjency_list[i][i+sizeX] = new_edge;
-  //     adjency_list[i+sizeX][i] = new_edge;
-  //   }
-  //
-  //   if(isValidIndex(i+sizeX*sizeY)){
-  //     Edge new_edge(&node_list[i], &node_list[i+sizeX*sizeY],static_cast<int>(resolution*1000));
-  //     adjency_list[i][i+sizeX*sizeY] = new_edge;
-  //     adjency_list[i+sizeX*sizeY][i] = new_edge;
-  //   }
-  // }
 }
 
   void Grid3D::insertScanPoint(
@@ -104,24 +79,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
     temp_occupied_nodes = all_occupied_nodes;
   }
 
-
-  // void Grid3D::HandleOccupancyChange(const int &node_index,const bool &change){
-  //   getNeighborIndex(node_index, neighborIdx);
-  //   if(change){
-  //     for(std::vector<int>::const_iterator it = neighborIdx.begin(); it != neighborIdx.end(); ++it){
-  //       adjency_list[node_index][*it].set_cost(INFINITY);
-  //     }
-  //   }
-  //   else{
-  //     for(std::vector<int>::const_iterator it = neighborIdx.begin(); it != neighborIdx.end(); ++it){
-  //       if(!node_list[*it].getOccupancy()){
-  //         adjency_list[node_index][*it].set_cost( static_cast<int>(toPosition(node_index).distance(toPosition(*it)))*1000 );
-  //       }
-  //     }
-  //   }
-  // }
-
-  void Grid3D::castRay(octomap::point3d& start, octomap::point3d& end, std::vector<int>& key_set){
+  void Grid3D::castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set){
     key_set.clear();
 
     int  idx[3];
