@@ -1,6 +1,6 @@
-#include "test_pcl2/path_planning/Astar.h"
-#include "test_pcl2/grid/Grid3D.h"
-#include "test_pcl2/grid/updatable_priority_queue.h"
+#include "path_planning/Astar.h"
+#include "grid/Grid3D.h"
+#include "grid/updatable_priority_queue.h"
 #include <algorithm>
 
 void Astar::extend_id(size_t idx){
@@ -46,7 +46,7 @@ bool Astar::find_path(const octomap::point3d& start_point,
       int newG = node_map[top_key].getG() + static_cast<int>(grid->resolution*1000);
 
       if(node_map[*it].getG() > newG){
-        node_map[*it].setParent(&node_map[top_key])
+        node_map[*it].setParent(&node_map[top_key]);
         node_map[*it].setG(newG);
         queue.update(*it, newG + node_map[*it].getH(), false);
         pre_node_map[*it] = top_key;
