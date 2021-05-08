@@ -32,7 +32,8 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 
 	this->nh_ = new ros::NodeHandle("~");
 	this->nh_->getParam("/dplanning/planning", this->planning);
-}
+	global_trajectory.header.frame_id = "map";
+ }
 
 void DPlanning::run(){
 
@@ -97,6 +98,10 @@ void DPlanning::run(){
 		pre_time = ros::Time::now();
 		travel_cost += distance(d_local_position, d_previous_position);
 		d_previous_position = d_local_position;
+
+		global_trajectory.poses.push_back(d_local_position);
+		ros_client->global_traj_pub.publish(global_trajectory);
+
 		switch(this->planning_type){
 			case PLANNING_TYPE::TAKE_OFF:
 			{
@@ -149,6 +154,7 @@ void DPlanning::run(){
 				// publishVisualize();
 				ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
+
 				break;
 			}
 			case PLANNING_TYPE::ASTAR:
@@ -170,7 +176,14 @@ void DPlanning::run(){
 							ros_client->publish_position_to_controller(endpoint_pos_ENU);
 						}
 						else{
-							octomap::point3d nextpos = grid.toPosition(path[0]);
+							octomap::point3d newpos = grid.toPosition(path[0]);
+							octomap::point3d nowpos(d_local_position.pose.position.x,
+							d_local_position.pose.position.y,
+						d_local_position.pose.position.z);
+							octomap::point3d nextpos = newpos - nowpos;
+							nextpos.normalize();
+							nextpos = nextpos*0.5;
+							nextpos = nowpos + nextpos;
 							setpoint_pos_ENU.pose.position.x = nextpos.x();
 							setpoint_pos_ENU.pose.position.y = nextpos.y();
 							setpoint_pos_ENU.pose.position.z = nextpos.z();
@@ -348,6 +361,7 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 		endpoint_active = true;
 		best_duration = 1000000000000;
 		worst_duration = 0;
+		global_trajectory.poses.clear();
 	}
 }
 

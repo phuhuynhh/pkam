@@ -5,6 +5,6 @@
 
     <node pkg="dplanning" type="dplanning" name="dplanning" output="screen">
       <!-- type of path planning -->
-      <param name="planning" value="1"/>
+      <param name="planning" value="2"/>
     </node>
 </launch>

@@ -30,6 +30,7 @@
 #include <std_srvs/SetBool.h>
 #include <visualization_msgs/Marker.h>
 #include "path_planning/Astar.h"
+#include <nav_msgs/Path.h>
 #include <chrono>
 
 class PlanningClient;
@@ -42,7 +43,7 @@ public:
 
 	// all the steering and path planning work with this grid
 	// this data structure take octomap as input and create ready to use grid
-	Grid3D grid = Grid3D(400, 400, 400, 0.5);
+	Grid3D grid = Grid3D(400, 400, 400, 0.8);
 	APF apf = APF(&grid);
 	Astar* astar;
 	ros::NodeHandle* nh_;
@@ -108,7 +109,6 @@ private:
 
 	visualization_msgs::Marker points, velocity_vector, global_trajectory_line;
 
-
 	double vx = 0.5;
 	double vy = 0.5;
 	double vz = 0.5;
@@ -119,6 +119,8 @@ private:
 	geometry_msgs::PoseStamped startpoint_pos_ENU;
 	geometry_msgs::PoseStamped endpoint_pos_ENU; //
 	sensor_msgs::PointCloud2 octomap_cloud;
+
+	nav_msgs::Path global_trajectory;
 
 	// Target_position
 	ros::Time start_time;
