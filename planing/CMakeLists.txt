@@ -17,6 +17,7 @@ set(PACKAGE_DEPENDENCIES
   sensor_msgs
   std_msgs
   geometry_msgs
+  nav_msgs
   octomap_ros
   visualization_msgs
 )

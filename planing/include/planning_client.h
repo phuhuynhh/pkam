@@ -29,6 +29,7 @@ class PlanningClient
     // Visualize Marker Public.
     ros::Publisher grid_marker_pub;
     ros::Publisher global_traj_marker_pub;
+    ros::Publisher global_traj_pub;
     ros::Publisher vel_marker_pub;
 
 

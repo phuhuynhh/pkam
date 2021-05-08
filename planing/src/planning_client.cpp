@@ -11,6 +11,7 @@
 #include <std_msgs/String.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <nav_msgs/Path.h>
 
 PlanningClient::PlanningClient(int &argc, char **argv)
 {
@@ -46,6 +47,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	// Visualizer Marker
 	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
 	global_traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/trajectory", 10);
+	global_traj_pub = nh_->advertise<nav_msgs::Path>("/planning/real_trajectory", 10);
 	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
 }
@@ -54,6 +56,6 @@ void PlanningClient::init(DPlanning *const drone_planing){
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){
 	setpoint_pos_pub.publish(setpoint_pos_ENU);
 
-	printf("next position (x,y,z) : (%f, %f, %f) \n", 
+	printf("next position (x,y,z) : (%f, %f, %f) \n",
 		setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
 }
