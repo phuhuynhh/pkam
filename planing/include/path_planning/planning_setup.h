@@ -12,6 +12,7 @@
 #include <ompl/base/MotionValidator.h>
 #include <ompl/base/ScopedState.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
+#include <ompl/base/spaces/SE3StateSpace.h>
 
 #include "validator/OctomapStateValidator.h"
 
@@ -27,14 +28,13 @@ class OctomapStateValidator;
 
 class PlanningSetup: public ompl::geometric::SimpleSetup {
 public:
-  PlanningSetup() : ompl::geometric::SimpleSetup(ompl::base::StateSpacePtr(new ompl::base::RealVectorStateSpace(3))){}
+  PlanningSetup() : ompl::geometric::SimpleSetup(ompl::base::StateSpacePtr(new ompl::base::SE3StateSpace())){}
 
   // Get some defaults.
   void setDefaultObjective() {
-    getProblemDefinition()->setOptimizationObjective(
-        ompl::base::OptimizationObjectivePtr(
-            new ompl::base::PathLengthOptimizationObjective(
-                getSpaceInformation())));
+    ompl::base::OptimizationObjectivePtr obj(new ompl::base::PathLengthOptimizationObjective(getSpaceInformation()));
+    obj->setCostToGoHeuristic(&ompl::base::goalRegionCostToGo);
+    getProblemDefinition()->setOptimizationObjective(obj);
   }
 
   void setDefaultPlanner() { setRrtStar(); }

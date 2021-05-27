@@ -37,14 +37,20 @@ public:
 
     std::shared_ptr<fcl::CollisionGeometry> Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.3, 0.3, 0.1));
     fcl::CollisionObject aircraftObject(Quadcopter);
+    fcl::CollisionObject treeObj((tree_obj));
 
-    const ompl::base::RealVectorStateSpace::StateType *pos = state->as<ompl::base::RealVectorStateSpace::StateType>();
+    // cast the abstract state type to the type we expect
+    const ompl::base::SE3StateSpace::StateType *se3state = state->as<ompl::base::SE3StateSpace::StateType>();
 
-		fcl::CollisionObject treeObj((tree_obj));
-    
-	    // check validity of state defined by pos & rot
+    // extract the first component of the state and cast it to what we expect
+    const ompl::base::RealVectorStateSpace::StateType *pos = se3state->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+    // extract the second component of the state and cast it to what we expect
+    const ompl::base::SO3StateSpace::StateType *rot = se3state->as<ompl::base::SO3StateSpace::StateType>(1);
+
+	  // check validity of state defined by pos & rot
 		fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
-		fcl::Quaternion3f rotation(1, 0, 0, 0);
+		fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
 		aircraftObject.setTransform(rotation, translation);
 		fcl::CollisionRequest requestType(1,false,1,false);
 		fcl::CollisionResult collisionResult;
