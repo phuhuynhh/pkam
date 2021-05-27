@@ -53,7 +53,7 @@
 
     <!-- MAVROS -->
     <arg name="fcu_url" default="udp://:14540@localhost:14557"/>
-    <arg name="respawn_mavros" default="false"/>
+    <arg name="respawn_mavros" default="true"/>
     <include file="$(find dcontroller)/launch/px4.launch">
         <!-- GCS link is provided by SITL -->
         <arg name="gcs_url" value=""/>
@@ -64,14 +64,11 @@
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find dcontroller)/rviz/pkam.rviz" />
 
     <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
-                <param name="resolution" value="0.2" />
-
+                <param name="resolution" value="0.4" />
                 <!-- fixed map frame (set to 'map' if SLAM or localization running!) -->
                 <param name="frame_id" type="string" value="/map" />
-
                 <!-- maximum range to integrate (speedup!) -->
                 <param name="sensor_model/max_range" value="10" />
-  
                 <!-- data source to integrate (PointCloud2) -->
                 <!-- <remap from="cloud_in" to="/cloud_in" /camera/depth/color/points /> -->
                 <remap from="cloud_in" to="/camera/depth/color/points" />
