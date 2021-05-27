@@ -13,6 +13,9 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Path.h>
 
+#include <octomap/octomap.h>
+#include <octomap_msgs/Octomap.h>
+
 PlanningClient::PlanningClient(int &argc, char **argv)
 {
 	this->nh_ = new ros::NodeHandle();
@@ -28,6 +31,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
 	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
+	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planing);
 
 	//For Planning process
 	/**

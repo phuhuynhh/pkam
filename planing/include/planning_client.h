@@ -5,6 +5,8 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <octomap_msgs/Octomap.h>
+
 
 class DPlanning; // Forward declaration because of circular reference
 
@@ -19,6 +21,7 @@ class PlanningClient
     ros::Subscriber local_pos_sub;
     ros::Subscriber global_pos_sub;
     ros::Subscriber local_octomap_sub;
+    ros::Subscriber octomap_sub;
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;

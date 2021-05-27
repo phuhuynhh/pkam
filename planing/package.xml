@@ -68,6 +68,9 @@
   <build_depend>octomap_ros</build_depend>
   <build_depend>visualization_msgs</build_depend>
   <build_depend>nav_msgs</build_depend>
+  <build_depend>ompl</build_depend>
+  <build_depend>mav_trajectory_generation</build_depend>
+
 
   <build_export_depend>mavros</build_export_depend>
   <build_export_depend>mavros_extras</build_export_depend>
@@ -85,6 +88,8 @@
   <build_export_depend>geometry_msgs</build_export_depend>
   <build_export_depend>octomap_ros</build_export_depend>
   <build_export_depend>nav_msgs</build_export_depend>
+  <build_export_depend>mav_trajectory_generation</build_export_depend>
+
 
   <exec_depend>mavros</exec_depend>
   <exec_depend>mavros_extras</exec_depend>
@@ -103,7 +108,7 @@
   <exec_depend>octomap_ros</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-
+  <exec_depend>mav_trajectory_generation</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

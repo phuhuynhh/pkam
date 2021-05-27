@@ -33,6 +33,21 @@
 #include <nav_msgs/Path.h>
 #include <chrono>
 
+#include <octomap_msgs/Octomap.h>
+
+#include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/RealVectorStateSpace.h>
+#include <ompl/base/OptimizationObjective.h>
+#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/InformedRRTstar.h>
+#include <ompl/geometric/SimpleSetup.h>
+
+#include <mav_trajectory_generation/polynomial_optimization_linear.h>
+#include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
+#include <mav_trajectory_generation/trajectory.h>
+
 class PlanningClient;
 class Grid3D;
 class APF;
@@ -43,8 +58,8 @@ public:
 
 	// all the steering and path planning work with this grid
 	// this data structure take octomap as input and create ready to use grid
-	Grid3D grid = Grid3D(400, 400, 400, 0.8);
-	APF apf = APF(&grid);
+	Grid3D *grid;
+	APF *apf;
 	Astar* astar;
 	ros::NodeHandle* nh_;
 	int planning = 1;
@@ -77,6 +92,7 @@ public:
 	geometry_msgs::PoseStamped d_local_position;
 	geometry_msgs::PoseStamped d_previous_position;
 	sensor_msgs::NavSatFix d_global_position;
+	octomap_msgs::Octomap::ConstPtr octomap_msgs;
 
 	// Saving init pose to home.
 	// geometry_msgs::PoseStamped target_position;
@@ -92,7 +108,7 @@ public:
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
 	void get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
   void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
-
+	void full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg);
 
 	void public_local_position();
 	void run();
@@ -132,6 +148,7 @@ private:
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);
 	double distance(const geometry_msgs::PoseStamped &p1, const geometry_msgs::PoseStamped &p2);
+	bool isStateValid(const ompl::base::State *state);
 };
 
 
