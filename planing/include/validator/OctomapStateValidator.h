@@ -35,7 +35,7 @@ public:
 
   virtual bool isValid(const ompl::base::State* state) const {
 
-    std::shared_ptr<fcl::CollisionGeometry> Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.3, 0.3, 0.1));
+    std::shared_ptr<fcl::CollisionGeometry> Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.5, 0.5, 0.5));
     fcl::CollisionObject aircraftObject(Quadcopter);
     fcl::CollisionObject treeObj((tree_obj));
 

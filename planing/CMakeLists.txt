@@ -24,6 +24,7 @@ set(PACKAGE_DEPENDENCIES
   octomap_ros
   visualization_msgs
   mav_trajectory_generation
+  mav_trajectory_generation_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS

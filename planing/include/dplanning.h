@@ -47,6 +47,11 @@
 #include <mav_trajectory_generation/polynomial_optimization_linear.h>
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation/trajectory.h>
+#include <mav_trajectory_generation/trajectory_sampling.h>
+
+#include <Eigen/Dense>
+#include <nav_msgs/Odometry.h>
+#include <eigen_conversions/eigen_msg.h>
 
 class PlanningClient;
 class Grid3D;

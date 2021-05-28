@@ -1,0 +1,49 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/turbo/catkin_ws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/turbo/catkin_ws/src/mavros_controllers/controller_msgs/include/**",
+        "/home/turbo/catkin_ws/src/pkam/controller/include/**",
+        "/home/turbo/catkin_ws/src/pkam/mapping/include/**",
+        "/home/turbo/catkin_ws/src/pkam/planing/include/**",
+        "/home/turbo/catkin_ws/src/eigen_checks/include/**",
+        "/home/turbo/catkin_ws/src/ewok/ewok_optimization/include/**",
+        "/home/turbo/catkin_ws/src/ewok/ewok_poly_spline/include/**",
+        "/home/turbo/catkin_ws/src/ewok/ewok_ring_buffer/include/**",
+        "/home/turbo/catkin_ws/src/ring_buffer/ewok_ring_buffer/include/**",
+        "/home/turbo/catkin_ws/src/ewok/ewok_simulation/include/**",
+        "/home/turbo/catkin_ws/src/mavros_controllers/geometric_controller/include/**",
+        "/home/turbo/catkin_ws/src/mavros/libmavconn/include/**",
+        "/home/turbo/catkin_ws/src/mav_comm/mav_msgs/include/**",
+        "/home/turbo/catkin_ws/src/mav_comm/mav_planning_msgs/include/**",
+        "/home/turbo/catkin_ws/src/mav_sim_gazebo/include/**",
+        "/home/turbo/catkin_ws/src/mav_trajectory_generation/mav_trajectory_generation/include/**",
+        "/home/turbo/catkin_ws/src/mav_trajectory_generation/mav_trajectory_generation_example/include/**",
+        "/home/turbo/catkin_ws/src/mav_trajectory_generation/mav_trajectory_generation_ros/include/**",
+        "/home/turbo/catkin_ws/src/mav_trajectory_generation/mav_visualization/include/**",
+        "/home/turbo/catkin_ws/src/mavros/mavros/include/**",
+        "/home/turbo/catkin_ws/src/mavros/mavros_msgs/include/**",
+        "/home/turbo/catkin_ws/src/nlopt/include/**",
+        "/home/turbo/catkin_ws/src/octomap_mapping/octomap_server/include/**",
+        "/home/turbo/catkin_ws/src/trajectory_generator/offboard_control/include/**",
+        "/home/turbo/catkin_ws/src/path_planning/include/**",
+        "/home/turbo/catkin_ws/src/ewok/rotors_simulator/rotors_control/include/**",
+        "/home/turbo/catkin_ws/src/ewok/rotors_simulator/rotors_gazebo_plugins/include/**",
+        "/home/turbo/catkin_ws/src/ewok/rotors_simulator/rotors_hil_interface/include/**",
+        "/home/turbo/catkin_ws/src/ewok/rotors_simulator/rotors_joy_interface/include/**",
+        "/home/turbo/catkin_ws/src/mavros/test_mavros/include/**",
+        "/home/turbo/catkin_ws/src/trajectory_generator/trajectory_planner/include/**",
+        "/home/turbo/catkin_ws/src/mavros_controllers/trajectory_publisher/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS"
+    }
+  ],
+  "version": 4
+}

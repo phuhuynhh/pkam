@@ -24,6 +24,8 @@
 #include "ompl/geometric/PathGeometric.h"
 
 #include <octomap_msgs/Octomap.h>
+#include <mav_trajectory_generation_ros/ros_visualization.h>
+#include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -328,12 +330,12 @@ void DPlanning::run(){
 				// set the bounds for the R^3 part of SE(3)
 				ob::RealVectorBounds bounds(3);
 
-				bounds.setLow(0,-20);
-				bounds.setHigh(0,20);
-				bounds.setLow(1,-20);
-				bounds.setHigh(1,20);
-				bounds.setLow(2,0);
-				bounds.setHigh(2,20);
+				bounds.setLow(0, -20);
+				bounds.setHigh(0, 20);
+				bounds.setLow(1, -20);
+				bounds.setHigh(1, 20);
+				bounds.setLow(2, 0);
+				bounds.setHigh(2, 10);
 
 				space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -355,7 +357,7 @@ void DPlanning::run(){
 			    // set state validity checking for this space
 				std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
 				si->setStateValidityChecker(validity_checker);
-
+											
 				// create a problem instance
 				ob::ProblemDefinitionPtr pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
 
@@ -368,7 +370,7 @@ void DPlanning::run(){
 
 				pdef->setOptimizationObjective(obj);
 
-				ob::PlannerPtr plan(new og::InformedRRTstar(si));
+				ob::PlannerPtr plan(new og::RRTstar(si));
 
 	    	// set the problem we are trying to solve for the planner
 				plan->setProblemDefinition(pdef);
@@ -376,17 +378,21 @@ void DPlanning::run(){
 			    // perform setup steps for the planner
 				plan->setup();
 
-			    // print the settings for this space
-				si->printSettings(std::cout);
-
-			    // print the problem settings
-				pdef->print(std::cout);
-
 			    // attempt to solve the problem within one second of planning time
 				ob::PlannerStatus solved = plan->solve(2);
 
 				if(solved){
 					int marr_index = 0;
+
+					mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+					mav_trajectory_generation ::Vertex::Vector vertices;
+					const int dimension = 3;
+					const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+					// we have 2 vertices:
+					// Start = current position
+					// end = desired position and velocity
+					mav_trajectory_generation::Vertex start(dimension), end(dimension);	
+
 
 					og::PathGeometric* path = pdef->getSolutionPath()->as<og::PathGeometric>();
 					for(std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++){
@@ -398,23 +404,57 @@ void DPlanning::run(){
 						// extract the second component of the state and cast it to what we expect
 						const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
 
-						visualization_msgs::Marker mk;
-						mk.id = marr_index;
-						mk.type = mk.CUBE;
-						marr_index += 1;
-						mk.header.frame_id = "map";
-						mk.pose.position.x = pos->values[0];
-						mk.pose.position.y = pos->values[1];
-						mk.pose.position.z = pos->values[2];
-						mk.color.r = 1.0;
-						mk.color.a = 1.0;
-						mk.scale.x = 0.2;
-						mk.scale.y = 0.2;
-						mk.scale.z = 0.2;
-						mkarr.markers.push_back(mk);
+						if(path_idx == 0){
+							start.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
+							// set start point's velocity to be constrained to current velocity
+  							start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d::Zero());
+							vertices.push_back(start);  
+						}
+						else if(path_idx == path->getStateCount() - 1){
+							end.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
+							// set start point's velocity to be constrained to current velocity
+							end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d(1,1,0.1));
+							vertices.push_back(end);
+						}
+						else{
+							mav_trajectory_generation::Vertex vertex(dimension);
+							vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]));
+							vertices.push_back(vertex);
+						}
 					}
 
+					// setimate initial segment times
+  					std::vector<double> segment_times;
+  					segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
+						// set up optimization problem
+					const int N = 10;
+					mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+					opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+					 // constrain velocity and acceleration
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
+
+  					// solve trajectory
+  					opt.optimize();
+
+ 					mav_trajectory_generation::Trajectory trajectory;
+					opt.getTrajectory(&trajectory);
 					ros_client->grid_marker_pub.publish(mkarr);
+
+					mav_msgs::EigenTrajectoryPoint::Vector states;
+					// Whole trajectory:
+					double sampling_interval = 0.01;
+					bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+
+					double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+					std::string frame_id = "map";
+
+					// From Trajectory class:
+					mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
+					ros_client->grid_marker_pub.publish(mkarr);
+					break;
+				
 				}
 				else{
 					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
