@@ -357,7 +357,9 @@ void DPlanning::run(){
 			    // set state validity checking for this space
 				std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
 				si->setStateValidityChecker(validity_checker);
-											
+				si->setStateValidityCheckingResolution(0.01);
+				si->setMotionValidator(std::make_shared<OctomapMotionValidator>(si, this->octomap_msgs));
+				si->setup();							
 				// create a problem instance
 				ob::ProblemDefinitionPtr pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
 
@@ -370,7 +372,7 @@ void DPlanning::run(){
 
 				pdef->setOptimizationObjective(obj);
 
-				ob::PlannerPtr plan(new og::RRTstar(si));
+				ob::PlannerPtr plan(new og::InformedRRTstar(si));
 
 	    	// set the problem we are trying to solve for the planner
 				plan->setProblemDefinition(pdef);
@@ -421,6 +423,21 @@ void DPlanning::run(){
 							vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]));
 							vertices.push_back(vertex);
 						}
+
+						// visualization_msgs::Marker mk;
+						// mk.id = marr_index;
+						// mk.type = mk.CUBE;
+						// marr_index += 1;
+						// mk.header.frame_id = "map";
+						// mk.pose.position.x = pos->values[0];
+						// mk.pose.position.y = pos->values[1];
+						// mk.pose.position.z = pos->values[2];
+						// mk.color.r = 1.0;
+						// mk.color.a = 1.0;
+						// mk.scale.x = 0.2;
+						// mk.scale.y = 0.2;
+						// mk.scale.z = 0.2;
+						// mkarr.markers.push_back(mk);
 					}
 
 					// setimate initial segment times
