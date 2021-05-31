@@ -73,7 +73,7 @@ void DPlanning::run(){
 	tf::TransformListener m_tfListener;
 
   pcl::PointCloud<pcl::PointXYZ> temp_cloud;
-visualization_msgs::MarkerArray mkarr;
+	visualization_msgs::MarkerArray mkarr;
 	if (octomap_activate){
   pcl::fromROSMsg(octomap_cloud,temp_cloud);
 
@@ -251,74 +251,81 @@ visualization_msgs::MarkerArray mkarr;
 			}
 			case PLANNING_TYPE::RRT:
 			{
-				// ros_client->publish_position_to_controller(d_local_position);
-				//
-				// PlanningSetup planning_setup;
-				// planning_setup.setOctomapValidator(this->octomap_msgs);
-				//
-				// ompl::base::RealVectorBounds bounds(3);
-				//
-				// bounds.setLow(0, -20);
-    		// bounds.setLow(1, -20);
-    		// bounds.setLow(2, -20);
-				//
-    		// bounds.setHigh(0, 20);
-    		// bounds.setHigh(1, 20);
-    		// bounds.setHigh(2, 20);
-				// planning_setup.getStateSpace()->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
-				//
-				// // planning_setup.setStateValidityCheckingResolution(0.1);
-				//
-				// ompl::base::ScopedState<ompl::base::SE3StateSpace> start_ompl(
-		 		// 			planning_setup.getSpaceInformation());
- 	 			// ompl::base::ScopedState<ompl::base::SE3StateSpace> goal_ompl(
-		 		// 			planning_setup.getSpaceInformation());
-				//
-				// start_ompl->setXYZ(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
-				// start_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				//
-				// goal_ompl->setXYZ(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
-				// goal_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				//
-				// planning_setup.setStartState(start_ompl);
-				// planning_setup.setGoalState(goal_ompl);
-				//
-				// planning_setup.setDefaultObjective();
-				//
-				// planning_setup.setRrtStar();
-				// planning_setup.setup();
-				// planning_setup.solve(0.05);
-				//
-				// if(planning_setup.haveSolutionPath()){
-				// 	int marr_index = 0;
-				//
-				// 	og::PathGeometric path = planning_setup.getSolutionPath();
-				// 	for(std::size_t path_idx = 0; path_idx < path.getStateCount(); path_idx++){
-				// 		const ob::SE3StateSpace::StateType *state = path.getState(path_idx)->as<ob::SE3StateSpace::StateType>();
-				// 		const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>(0);
-				// 		const ob::SO3StateSpace::StateType *rot = state->as<ob::SO3StateSpace::StateType>(1);
-				//
-				// 		visualization_msgs::Marker mk;
-				// 		mk.id = marr_index;
-				// 		mk.type = mk.CUBE;
-				// 		marr_index += 1;
-				// 		mk.header.frame_id = "map";
-				// 		mk.pose.position.x = pos->values[0];
-				// 		mk.pose.position.y = pos->values[1];
-				// 		mk.pose.position.z = pos->values[2];
-				// 		mk.color.r = 1.0;
-				// 		mk.color.a = 1.0;
-				// 		mk.scale.x = 0.2;
-				// 		mk.scale.y = 0.2;
-				// 		mk.scale.z = 0.2;
-				// 		mkarr.markers.push_back(mk);
-				// 	}
-				//
-				// 	ros_client->grid_marker_pub.publish(mkarr);
-				// }
-				// else{
-				// 	ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
-				// }
+
+				// Create way to enter end_point target position ~ Assign Khang VO.
+				/*
+				//Clean code.
+
+
+				ros_client->publish_position_to_controller(d_local_position);
+				
+				PlanningSetup planning_setup;
+				planning_setup.setOctomapValidator(this->octomap_msgs);
+				
+				ompl::base::RealVectorBounds bounds(3);
+				
+				bounds.setLow(0, -20);
+    		bounds.setLow(1, -20);
+    		bounds.setLow(2, -20);
+				
+    		bounds.setHigh(0, 20);
+    		bounds.setHigh(1, 20);
+    		bounds.setHigh(2, 20);
+				planning_setup.getStateSpace()->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
+				
+				
+				ompl::base::ScopedState<ompl::base::SE3StateSpace> start_ompl(
+		 					planning_setup.getSpaceInformation());
+ 	 			ompl::base::ScopedState<ompl::base::SE3StateSpace> goal_ompl(
+		 					planning_setup.getSpaceInformation());
+				
+				start_ompl->setXYZ(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
+				start_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+				
+				goal_ompl->setXYZ(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
+				goal_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+				
+				planning_setup.setStartState(start_ompl);
+				planning_setup.setGoalState(goal_ompl);
+				
+				planning_setup.setDefaultObjective();
+				
+				planning_setup.setRrtStar();
+				planning_setup.setup();
+				planning_setup.solve(0.05);
+				
+				if(planning_setup.haveSolutionPath()){
+					int marr_index = 0;
+				
+					og::PathGeometric path = planning_setup.getSolutionPath();
+					for(std::size_t path_idx = 0; path_idx < path.getStateCount(); path_idx++){
+						const ob::SE3StateSpace::StateType *state = path.getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+						const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>(0);
+						const ob::SO3StateSpace::StateType *rot = state->as<ob::SO3StateSpace::StateType>(1);
+				
+						visualization_msgs::Marker mk;
+						mk.id = marr_index;
+						mk.type = mk.CUBE;
+						marr_index += 1;
+						mk.header.frame_id = "map";
+						mk.pose.position.x = pos->values[0];
+						mk.pose.position.y = pos->values[1];
+						mk.pose.position.z = pos->values[2];
+						mk.color.r = 1.0;
+						mk.color.a = 1.0;
+						mk.scale.x = 0.2;
+						mk.scale.y = 0.2;
+						mk.scale.z = 0.2;
+						mkarr.markers.push_back(mk);
+					}
+				
+					ros_client->grid_marker_pub.publish(mkarr);
+				}
+				else{
+					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
+				}
+
+				*/
 
 				ob::StateSpacePtr space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
@@ -331,6 +338,7 @@ visualization_msgs::MarkerArray mkarr;
 				// set the bounds for the R^3 part of SE(3)
 				ob::RealVectorBounds bounds(3);
 
+				// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
 				bounds.setLow(0, -20);
 				bounds.setHigh(0, 20);
 				bounds.setLow(1, -20);
@@ -444,6 +452,12 @@ visualization_msgs::MarkerArray mkarr;
 					ros_client->grid_marker_pub.publish(mkarr);
 
 					mav_msgs::EigenTrajectoryPoint::Vector states;
+					//use it for controller.
+					// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+					// in EigenTrajectoryPoint struct 
+					// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+
 					// Whole trajectory:
 					double sampling_interval = 0.01;
 					bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
