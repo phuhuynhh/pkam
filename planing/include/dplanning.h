@@ -141,6 +141,12 @@ private:
 	geometry_msgs::PoseStamped endpoint_pos_ENU; //
 	sensor_msgs::PointCloud2 octomap_cloud;
 
+	// Space bounds
+  	double _min_bounds[3];
+  	double _max_bounds[3];
+	  // goal state
+  	double _prev_goal[7];
+
 	nav_msgs::Path global_trajectory;
 
 	// Target_position

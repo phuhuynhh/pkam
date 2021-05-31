@@ -65,6 +65,13 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 		}
 	}
 	this->grid->Initilize(octomap::point3d(0.0,0.0,0.0));
+	_prev_goal[0] = 0.0;
+  	_prev_goal[1] = 7.0;
+  	_prev_goal[2] = 2.18;
+  	_prev_goal[3] = 1;
+  	_prev_goal[4] = 0;
+  	_prev_goal[5] = 0;
+  	_prev_goal[6] = 0;
  }
 
 void DPlanning::run(){
@@ -330,12 +337,12 @@ void DPlanning::run(){
 				// set the bounds for the R^3 part of SE(3)
 				ob::RealVectorBounds bounds(3);
 
-				bounds.setLow(0, -20);
-				bounds.setHigh(0, 20);
-				bounds.setLow(1, -20);
-				bounds.setHigh(1, 20);
-				bounds.setLow(2, 0);
-				bounds.setHigh(2, 10);
+				bounds.setLow(0, _min_bounds[0]);   // x min
+  				bounds.setHigh(0, _max_bounds[0]);  // x max
+  				bounds.setLow(1, _min_bounds[1]);   // y min
+  				bounds.setHigh(1, _max_bounds[1]);  // y max
+  				bounds.setLow(2, _min_bounds[2]);   // z min
+  				bounds.setHigh(2, _max_bounds[2]);  // z max
 
 				space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -424,51 +431,51 @@ void DPlanning::run(){
 							vertices.push_back(vertex);
 						}
 
-						// visualization_msgs::Marker mk;
-						// mk.id = marr_index;
-						// mk.type = mk.CUBE;
-						// marr_index += 1;
-						// mk.header.frame_id = "map";
-						// mk.pose.position.x = pos->values[0];
-						// mk.pose.position.y = pos->values[1];
-						// mk.pose.position.z = pos->values[2];
-						// mk.color.r = 1.0;
-						// mk.color.a = 1.0;
-						// mk.scale.x = 0.2;
-						// mk.scale.y = 0.2;
-						// mk.scale.z = 0.2;
-						// mkarr.markers.push_back(mk);
+						visualization_msgs::Marker mk;
+						mk.id = marr_index;
+						mk.type = mk.CUBE;
+						marr_index += 1;
+						mk.header.frame_id = "map";
+						mk.pose.position.x = pos->values[0];
+						mk.pose.position.y = pos->values[1];
+						mk.pose.position.z = pos->values[2];
+						mk.color.r = 1.0;
+						mk.color.a = 1.0;
+						mk.scale.x = 0.2;
+						mk.scale.y = 0.2;
+						mk.scale.z = 0.2;
+						mkarr.markers.push_back(mk);
 					}
 
-					// setimate initial segment times
-  					std::vector<double> segment_times;
-  					segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
-						// set up optimization problem
-					const int N = 10;
-					mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
-					opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+					// // setimate initial segment times
+  					// std::vector<double> segment_times;
+  					// segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
+					// 	// set up optimization problem
+					// const int N = 10;
+					// mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+					// opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
-					 // constrain velocity and acceleration
-  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
-  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
+					//  // constrain velocity and acceleration
+  					// opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
+  					// opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
 
-  					// solve trajectory
-  					opt.optimize();
+  					// // solve trajectory
+  					// opt.optimize();
 
- 					mav_trajectory_generation::Trajectory trajectory;
-					opt.getTrajectory(&trajectory);
-					ros_client->grid_marker_pub.publish(mkarr);
+ 					// mav_trajectory_generation::Trajectory trajectory;
+					// opt.getTrajectory(&trajectory);
+					// ros_client->grid_marker_pub.publish(mkarr);
 
-					mav_msgs::EigenTrajectoryPoint::Vector states;
-					// Whole trajectory:
-					double sampling_interval = 0.01;
-					bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+					// mav_msgs::EigenTrajectoryPoint::Vector states;
+					// // Whole trajectory:
+					// double sampling_interval = 0.01;
+					// bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
 
-					double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
-					std::string frame_id = "map";
+					// double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+					// std::string frame_id = "map";
 
-					// From Trajectory class:
-					mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
+					// // From Trajectory class:
+					// mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
 					ros_client->grid_marker_pub.publish(mkarr);
 					break;
 				
@@ -525,7 +532,23 @@ void DPlanning::global_position_callback(const sensor_msgs::NavSatFix::ConstPtr 
 
 void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg){
 	if (!endpoint_active){
-		endpoint_pos_ENU = *msg;
+
+		if (msg->pose.position.x > _min_bounds[0] && msg->pose.position.x < _max_bounds[0] &&
+      		msg->pose.position.y > _min_bounds[1] && msg->pose.position.y < _max_bounds[1] &&
+      		msg->pose.position.z > _min_bounds[2] && msg->pose.position.z < _max_bounds[2])
+			  {
+				endpoint_pos_ENU.pose.position.x = msg->pose.position.x;
+				endpoint_pos_ENU.pose.position.y = msg->pose.position.y;
+				endpoint_pos_ENU.pose.position.z = msg->pose.position.z;
+			  }
+		else{
+			endpoint_pos_ENU.pose.position.x = _prev_goal[0];
+			endpoint_pos_ENU.pose.position.y = _prev_goal[1];
+			endpoint_pos_ENU.pose.position.z = _prev_goal[2];
+		}
+
+
+
 		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
@@ -556,6 +579,13 @@ void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
 
 void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg){
 	this->octomap_msgs = msg;
+	// ROS_INFO("OCTOMAP CALLBACK 1");
+  	// // convert ColorOcTree to OcTree
+  	// octomap::OcTree* tree_oct = reinterpret_cast<octomap::OcTree*>(tree_coloct);
+  	octomap::OcTree* tree_oct = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
+  	
+  	tree_oct->getMetricMin(_min_bounds[0], _min_bounds[1], _min_bounds[2]);
+  	tree_oct->getMetricMax(_max_bounds[0], _max_bounds[1], _max_bounds[2]);
 }
 
 
