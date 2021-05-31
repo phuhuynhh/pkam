@@ -73,9 +73,10 @@ void DPlanning::run(){
 	tf::TransformListener m_tfListener;
 
   pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+visualization_msgs::MarkerArray mkarr;
+	if (octomap_activate){
   pcl::fromROSMsg(octomap_cloud,temp_cloud);
 
-	visualization_msgs::MarkerArray mkarr;
 
 	tf::StampedTransform sensorToWorldTf;
 	try {
@@ -90,7 +91,7 @@ void DPlanning::run(){
 	pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
 
 	this->grid->insertOctomapCloud(temp_cloud);
-
+	}
 	if (endpoint_active){
 		if (distance(d_local_position,endpoint_pos_ENU) < 0.2){
 			double travel_time = ros::Time::now().toSec() - start_time.toSec();
@@ -534,6 +535,9 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 }
 
 void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
+	if (!octomap_activate){
+		octomap_activate = true;
+	}
 	this->octomap_cloud = *msg;
 }
 

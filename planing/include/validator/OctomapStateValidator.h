@@ -35,7 +35,7 @@ public:
 
   virtual bool isValid(const ompl::base::State* state) const {
 
-    std::shared_ptr<fcl::CollisionGeometry> Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.5, 0.5, 0.5));
+    std::shared_ptr<fcl::CollisionGeometry> Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(2.0, 2.0, 2.0));
     fcl::CollisionObject aircraftObject(Quadcopter);
     fcl::CollisionObject treeObj((tree_obj));
 
@@ -73,35 +73,80 @@ public:
   }
 
   virtual bool checkMotion(const ompl::base::State* s1, const ompl::base::State* s2) const {
-    std::pair<ompl::base::State*, double> unused;
-    return checkMotion(s1, s2, unused);
+    // cast the abstract state type to the type we expect
+    const ompl::base::SE3StateSpace::StateType *s_ = s1->as<ompl::base::SE3StateSpace::StateType>();
 
-    // return true;
+    // extract the first component of the state and cast it to what we expect
+    const ompl::base::RealVectorStateSpace::StateType *s = s_->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+    // cast the abstract state type to the type we expect
+    const ompl::base::SE3StateSpace::StateType *e_ = s2->as<ompl::base::SE3StateSpace::StateType>();
+
+    // extract the first component of the state and cast it to what we expect
+    const ompl::base::RealVectorStateSpace::StateType *e = e_->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+    octomap::point3d start(s->values[0],s->values[1],s->values[2]);
+    octomap::point3d end(e->values[0],e->values[1],e->values[2]); 
+    octomap::point3d direction = end - start;  
+    // if(direction.norm() > 2) return false;
+    octomap::point3d pos;
+
+    return !colorTree->castRay(start, direction, pos, true, direction.norm());
   }
 
   virtual bool checkMotion(const ompl::base::State* s1, const ompl::base::State* s2,
                            std::pair<ompl::base::State*, double>& last_valid) const {
-    // octomap::point3d start = omplToPoint(s1);
-    // octomap::point3d end = omplToPoint(s2);
-    // unsigned int depth = colorTree->getTreeDepth();
-    //
-    // octomap::point3d pos;
-    //
-    // if(colorTree->castRay(start, end, pos, true)){
+    // cast the abstract state type to the type we expect
+    const ompl::base::SE3StateSpace::StateType *s_ = s1->as<ompl::base::SE3StateSpace::StateType>();
+
+    // extract the first component of the state and cast it to what we expect
+    const ompl::base::RealVectorStateSpace::StateType *s = s_->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+    // cast the abstract state type to the type we expect
+    const ompl::base::SE3StateSpace::StateType *e_ = s2->as<ompl::base::SE3StateSpace::StateType>();
+
+    // extract the first component of the state and cast it to what we expect
+    const ompl::base::RealVectorStateSpace::StateType *e = e_->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+    octomap::point3d start(s->values[0],s->values[1],s->values[2]);
+    octomap::point3d end(e->values[0],e->values[1],e->values[2]); 
+    octomap::point3d direction = end - start; 
+    octomap::point3d pos;
+
+    // if(direction.norm() > 2){
+    //   octomap::point3d vec = direction.normalized();
+    //   pos = start + vec*2;
     //   if (last_valid.first) {
-    //     ompl::base::ScopedState<ompl::base::RealVectorStateSpace> last_valid_state(
+    //     ompl::base::ScopedState<ompl::base::SE3StateSpace> last_valid_state(
     //         si_->getStateSpace());
-    //     last_valid_state->values[0] = pos.x();
-    //     last_valid_state->values[1] = pos.y();
-    //     last_valid_state->values[2] = pos.z();
-    //
+    //     last_valid_state->setXYZ(pos.x(),
+		// 									pos.y(),
+		// 									pos.z());
+		// 		last_valid_state->as<ompl::base::SO3StateSpace::StateType>(1)->setIdentity();
+    
     //     si_->copyState(last_valid.first, last_valid_state.get());
     //   }
-    //
+    
     //   last_valid.second = static_cast<double>(pos.distance(start) / end.distance(start));
     //   return false;
-    // }
+    // } 
+    
 
+    if(colorTree->castRay(start, direction, pos, true, direction.norm())){
+      if (last_valid.first) {
+        ompl::base::ScopedState<ompl::base::SE3StateSpace> last_valid_state(
+            si_->getStateSpace());
+        last_valid_state->setXYZ(pos.x(),
+											pos.y(),
+											pos.z());
+				last_valid_state->as<ompl::base::SO3StateSpace::StateType>(1)->setIdentity();
+    
+        si_->copyState(last_valid.first, last_valid_state.get());
+      }
+    
+      last_valid.second = static_cast<double>(pos.distance(start) / end.distance(start));
+      return false;
+    }
     return true;
   }
 
