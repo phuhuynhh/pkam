@@ -357,7 +357,7 @@ void DPlanning::run(){
 			    // set state validity checking for this space
 				std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
 				si->setStateValidityChecker(validity_checker);
-											
+
 				// create a problem instance
 				ob::ProblemDefinitionPtr pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
 
@@ -391,7 +391,7 @@ void DPlanning::run(){
 					// we have 2 vertices:
 					// Start = current position
 					// end = desired position and velocity
-					mav_trajectory_generation::Vertex start(dimension), end(dimension);	
+					mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 
 					og::PathGeometric* path = pdef->getSolutionPath()->as<og::PathGeometric>();
@@ -408,7 +408,7 @@ void DPlanning::run(){
 							start.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
 							// set start point's velocity to be constrained to current velocity
   							start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d::Zero());
-							vertices.push_back(start);  
+							vertices.push_back(start);
 						}
 						else if(path_idx == path->getStateCount() - 1){
 							end.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
@@ -454,7 +454,7 @@ void DPlanning::run(){
 					mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
 					ros_client->grid_marker_pub.publish(mkarr);
 					break;
-				
+
 				}
 				else{
 					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
