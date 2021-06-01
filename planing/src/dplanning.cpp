@@ -65,13 +65,6 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 		}
 	}
 	this->grid->Initilize(octomap::point3d(0.0,0.0,0.0));
-	_prev_goal[0] = 0.0;
-  	_prev_goal[1] = 7.0;
-  	_prev_goal[2] = 2.18;
-  	_prev_goal[3] = 1;
-  	_prev_goal[4] = 0;
-  	_prev_goal[5] = 0;
-  	_prev_goal[6] = 0;
  }
 
 void DPlanning::run(){
@@ -80,9 +73,10 @@ void DPlanning::run(){
 	tf::TransformListener m_tfListener;
 
   pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+	visualization_msgs::MarkerArray mkarr;
+	if (octomap_activate){
   pcl::fromROSMsg(octomap_cloud,temp_cloud);
 
-	visualization_msgs::MarkerArray mkarr;
 
 	tf::StampedTransform sensorToWorldTf;
 	try {
@@ -97,7 +91,7 @@ void DPlanning::run(){
 	pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
 
 	this->grid->insertOctomapCloud(temp_cloud);
-
+	}
 	if (endpoint_active){
 		if (distance(d_local_position,endpoint_pos_ENU) < 0.2){
 			double travel_time = ros::Time::now().toSec() - start_time.toSec();
@@ -257,74 +251,81 @@ void DPlanning::run(){
 			}
 			case PLANNING_TYPE::RRT:
 			{
-				// ros_client->publish_position_to_controller(d_local_position);
-				//
-				// PlanningSetup planning_setup;
-				// planning_setup.setOctomapValidator(this->octomap_msgs);
-				//
-				// ompl::base::RealVectorBounds bounds(3);
-				//
-				// bounds.setLow(0, -20);
-    		// bounds.setLow(1, -20);
-    		// bounds.setLow(2, -20);
-				//
-    		// bounds.setHigh(0, 20);
-    		// bounds.setHigh(1, 20);
-    		// bounds.setHigh(2, 20);
-				// planning_setup.getStateSpace()->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
-				//
-				// // planning_setup.setStateValidityCheckingResolution(0.1);
-				//
-				// ompl::base::ScopedState<ompl::base::SE3StateSpace> start_ompl(
-		 		// 			planning_setup.getSpaceInformation());
- 	 			// ompl::base::ScopedState<ompl::base::SE3StateSpace> goal_ompl(
-		 		// 			planning_setup.getSpaceInformation());
-				//
-				// start_ompl->setXYZ(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
-				// start_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				//
-				// goal_ompl->setXYZ(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
-				// goal_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				//
-				// planning_setup.setStartState(start_ompl);
-				// planning_setup.setGoalState(goal_ompl);
-				//
-				// planning_setup.setDefaultObjective();
-				//
-				// planning_setup.setRrtStar();
-				// planning_setup.setup();
-				// planning_setup.solve(0.05);
-				//
-				// if(planning_setup.haveSolutionPath()){
-				// 	int marr_index = 0;
-				//
-				// 	og::PathGeometric path = planning_setup.getSolutionPath();
-				// 	for(std::size_t path_idx = 0; path_idx < path.getStateCount(); path_idx++){
-				// 		const ob::SE3StateSpace::StateType *state = path.getState(path_idx)->as<ob::SE3StateSpace::StateType>();
-				// 		const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>(0);
-				// 		const ob::SO3StateSpace::StateType *rot = state->as<ob::SO3StateSpace::StateType>(1);
-				//
-				// 		visualization_msgs::Marker mk;
-				// 		mk.id = marr_index;
-				// 		mk.type = mk.CUBE;
-				// 		marr_index += 1;
-				// 		mk.header.frame_id = "map";
-				// 		mk.pose.position.x = pos->values[0];
-				// 		mk.pose.position.y = pos->values[1];
-				// 		mk.pose.position.z = pos->values[2];
-				// 		mk.color.r = 1.0;
-				// 		mk.color.a = 1.0;
-				// 		mk.scale.x = 0.2;
-				// 		mk.scale.y = 0.2;
-				// 		mk.scale.z = 0.2;
-				// 		mkarr.markers.push_back(mk);
-				// 	}
-				//
-				// 	ros_client->grid_marker_pub.publish(mkarr);
-				// }
-				// else{
-				// 	ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
-				// }
+
+				// Create way to enter end_point target position ~ Assign Khang VO.
+				/*
+				//Clean code.
+
+
+				ros_client->publish_position_to_controller(d_local_position);
+				
+				PlanningSetup planning_setup;
+				planning_setup.setOctomapValidator(this->octomap_msgs);
+				
+				ompl::base::RealVectorBounds bounds(3);
+				
+				bounds.setLow(0, -20);
+    		bounds.setLow(1, -20);
+    		bounds.setLow(2, -20);
+				
+    		bounds.setHigh(0, 20);
+    		bounds.setHigh(1, 20);
+    		bounds.setHigh(2, 20);
+				planning_setup.getStateSpace()->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
+				
+				
+				ompl::base::ScopedState<ompl::base::SE3StateSpace> start_ompl(
+		 					planning_setup.getSpaceInformation());
+ 	 			ompl::base::ScopedState<ompl::base::SE3StateSpace> goal_ompl(
+		 					planning_setup.getSpaceInformation());
+				
+				start_ompl->setXYZ(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
+				start_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+				
+				goal_ompl->setXYZ(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
+				goal_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+				
+				planning_setup.setStartState(start_ompl);
+				planning_setup.setGoalState(goal_ompl);
+				
+				planning_setup.setDefaultObjective();
+				
+				planning_setup.setRrtStar();
+				planning_setup.setup();
+				planning_setup.solve(0.05);
+				
+				if(planning_setup.haveSolutionPath()){
+					int marr_index = 0;
+				
+					og::PathGeometric path = planning_setup.getSolutionPath();
+					for(std::size_t path_idx = 0; path_idx < path.getStateCount(); path_idx++){
+						const ob::SE3StateSpace::StateType *state = path.getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+						const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>(0);
+						const ob::SO3StateSpace::StateType *rot = state->as<ob::SO3StateSpace::StateType>(1);
+				
+						visualization_msgs::Marker mk;
+						mk.id = marr_index;
+						mk.type = mk.CUBE;
+						marr_index += 1;
+						mk.header.frame_id = "map";
+						mk.pose.position.x = pos->values[0];
+						mk.pose.position.y = pos->values[1];
+						mk.pose.position.z = pos->values[2];
+						mk.color.r = 1.0;
+						mk.color.a = 1.0;
+						mk.scale.x = 0.2;
+						mk.scale.y = 0.2;
+						mk.scale.z = 0.2;
+						mkarr.markers.push_back(mk);
+					}
+				
+					ros_client->grid_marker_pub.publish(mkarr);
+				}
+				else{
+					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
+				}
+
+				*/
 
 				ob::StateSpacePtr space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
@@ -337,12 +338,13 @@ void DPlanning::run(){
 				// set the bounds for the R^3 part of SE(3)
 				ob::RealVectorBounds bounds(3);
 
-				bounds.setLow(0, _min_bounds[0]);   // x min
-  				bounds.setHigh(0, _max_bounds[0]);  // x max
-  				bounds.setLow(1, _min_bounds[1]);   // y min
-  				bounds.setHigh(1, _max_bounds[1]);  // y max
-  				bounds.setLow(2, _min_bounds[2]);   // z min
-  				bounds.setHigh(2, _max_bounds[2]);  // z max
+				// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
+				bounds.setLow(0, -20);
+				bounds.setHigh(0, 20);
+				bounds.setLow(1, -20);
+				bounds.setHigh(1, 20);
+				bounds.setLow(2, 0);
+				bounds.setHigh(2, 10);
 
 				space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -364,9 +366,7 @@ void DPlanning::run(){
 			    // set state validity checking for this space
 				std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
 				si->setStateValidityChecker(validity_checker);
-				si->setStateValidityCheckingResolution(0.01);
-				si->setMotionValidator(std::make_shared<OctomapMotionValidator>(si, this->octomap_msgs));
-				si->setup();							
+
 				// create a problem instance
 				ob::ProblemDefinitionPtr pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
 
@@ -379,7 +379,7 @@ void DPlanning::run(){
 
 				pdef->setOptimizationObjective(obj);
 
-				ob::PlannerPtr plan(new og::InformedRRTstar(si));
+				ob::PlannerPtr plan(new og::RRTstar(si));
 
 	    	// set the problem we are trying to solve for the planner
 				plan->setProblemDefinition(pdef);
@@ -400,7 +400,7 @@ void DPlanning::run(){
 					// we have 2 vertices:
 					// Start = current position
 					// end = desired position and velocity
-					mav_trajectory_generation::Vertex start(dimension), end(dimension);	
+					mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 
 					og::PathGeometric* path = pdef->getSolutionPath()->as<og::PathGeometric>();
@@ -417,7 +417,7 @@ void DPlanning::run(){
 							start.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
 							// set start point's velocity to be constrained to current velocity
   							start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d::Zero());
-							vertices.push_back(start);  
+							vertices.push_back(start);
 						}
 						else if(path_idx == path->getStateCount() - 1){
 							end.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
@@ -430,55 +430,46 @@ void DPlanning::run(){
 							vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]));
 							vertices.push_back(vertex);
 						}
-
-						visualization_msgs::Marker mk;
-						mk.id = marr_index;
-						mk.type = mk.CUBE;
-						marr_index += 1;
-						mk.header.frame_id = "map";
-						mk.pose.position.x = pos->values[0];
-						mk.pose.position.y = pos->values[1];
-						mk.pose.position.z = pos->values[2];
-						mk.color.r = 1.0;
-						mk.color.a = 1.0;
-						mk.scale.x = 0.2;
-						mk.scale.y = 0.2;
-						mk.scale.z = 0.2;
-						mkarr.markers.push_back(mk);
 					}
 
-					// // setimate initial segment times
-  					// std::vector<double> segment_times;
-  					// segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
-					// 	// set up optimization problem
-					// const int N = 10;
-					// mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
-					// opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+					// setimate initial segment times
+  					std::vector<double> segment_times;
+  					segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
+						// set up optimization problem
+					const int N = 10;
+					mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+					opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
-					//  // constrain velocity and acceleration
-  					// opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
-  					// opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
+					 // constrain velocity and acceleration
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
 
-  					// // solve trajectory
-  					// opt.optimize();
+  					// solve trajectory
+  					opt.optimize();
 
- 					// mav_trajectory_generation::Trajectory trajectory;
-					// opt.getTrajectory(&trajectory);
-					// ros_client->grid_marker_pub.publish(mkarr);
+ 					mav_trajectory_generation::Trajectory trajectory;
+					opt.getTrajectory(&trajectory);
+					ros_client->grid_marker_pub.publish(mkarr);
 
-					// mav_msgs::EigenTrajectoryPoint::Vector states;
-					// // Whole trajectory:
-					// double sampling_interval = 0.01;
-					// bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+					mav_msgs::EigenTrajectoryPoint::Vector states;
+					//use it for controller.
+					// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+					// in EigenTrajectoryPoint struct 
+					// TODO : having topic for this structure ~ Assign Phu HUYNH.
 
-					// double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
-					// std::string frame_id = "map";
 
-					// // From Trajectory class:
-					// mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
+					// Whole trajectory:
+					double sampling_interval = 0.01;
+					bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+
+					double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+					std::string frame_id = "map";
+
+					// From Trajectory class:
+					mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
 					ros_client->grid_marker_pub.publish(mkarr);
 					break;
-				
+
 				}
 				else{
 					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
@@ -532,23 +523,7 @@ void DPlanning::global_position_callback(const sensor_msgs::NavSatFix::ConstPtr 
 
 void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg){
 	if (!endpoint_active){
-
-		if (msg->pose.position.x > _min_bounds[0] && msg->pose.position.x < _max_bounds[0] &&
-      		msg->pose.position.y > _min_bounds[1] && msg->pose.position.y < _max_bounds[1] &&
-      		msg->pose.position.z > _min_bounds[2] && msg->pose.position.z < _max_bounds[2])
-			  {
-				endpoint_pos_ENU.pose.position.x = msg->pose.position.x;
-				endpoint_pos_ENU.pose.position.y = msg->pose.position.y;
-				endpoint_pos_ENU.pose.position.z = msg->pose.position.z;
-			  }
-		else{
-			endpoint_pos_ENU.pose.position.x = _prev_goal[0];
-			endpoint_pos_ENU.pose.position.y = _prev_goal[1];
-			endpoint_pos_ENU.pose.position.z = _prev_goal[2];
-		}
-
-
-
+		endpoint_pos_ENU = *msg;
 		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
@@ -574,18 +549,14 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 }
 
 void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg){
+	if (!octomap_activate){
+		octomap_activate = true;
+	}
 	this->octomap_cloud = *msg;
 }
 
 void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg){
 	this->octomap_msgs = msg;
-	// ROS_INFO("OCTOMAP CALLBACK 1");
-  	// // convert ColorOcTree to OcTree
-  	// octomap::OcTree* tree_oct = reinterpret_cast<octomap::OcTree*>(tree_coloct);
-  	octomap::OcTree* tree_oct = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
-  	
-  	tree_oct->getMetricMin(_min_bounds[0], _min_bounds[1], _min_bounds[2]);
-  	tree_oct->getMetricMax(_max_bounds[0], _max_bounds[1], _max_bounds[2]);
 }
 
 
