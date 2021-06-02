@@ -29,7 +29,7 @@ public:
 
     void draw_global_trajectory();
     void setParam(const std::string &key, double d);
-    void originCloudCallback(Mapping *this,const geometry_msgs::PoseStamped::ConstPtr &pose, const sensor_msgs::PointCloud2::ConstPtr &cloud);
+    void odomCloudCallback(const geometry_msgs::PoseStampedConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud);
     bool avoidCollision_ = true;
 
     ros::NodeHandle *nh_;

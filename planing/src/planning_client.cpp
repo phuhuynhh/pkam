@@ -30,6 +30,8 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planing);
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
+	//TODO : Need subcrible vel,acc for adding constraint.
+
 	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
 	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planing);
 
@@ -54,7 +56,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	global_traj_pub = nh_->advertise<nav_msgs::Path>("/planning/real_trajectory", 10);
 	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
-}
+}\
 
 //Not need spinOnce() in here, in planning_node already had.
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){
