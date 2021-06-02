@@ -34,7 +34,10 @@ void ControlClient::init(DController *const drone_control)
 
   	//For Path Planing.
 	getpoint_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10, &DController::getpoint_position_callback, drone_control);
+	
 	setpoint_pos_local_pub = nh_->advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);
+	
+
 
 
 

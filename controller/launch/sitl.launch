@@ -11,7 +11,7 @@
     <arg name="est" default="ekf2"/>
     <arg name="vehicle" default="iris"/>
     <arg name="my_vehicle" default="iris_d435"/>
-    <arg name="world" default="$(find dcontroller)/gazebo/worlds/wall20x20.world"/>
+    <arg name="world" default="$(find dcontroller)/gazebo/worlds/hard_wall.world"/>
     <arg name="sdf" default="$(find dcontroller)/gazebo/models/$(arg my_vehicle)/$(arg my_vehicle).sdf"/>
 
 
