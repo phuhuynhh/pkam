@@ -29,6 +29,7 @@
 
 #include <std_srvs/SetBool.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include "path_planning/Astar.h"
 #include <nav_msgs/Path.h>
 #include <chrono>
@@ -43,11 +44,14 @@
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 #include <ompl/geometric/planners/rrt/InformedRRTstar.h>
 #include <ompl/geometric/SimpleSetup.h>
+#include "ompl/geometric/PathGeometric.h"
 
 #include <mav_trajectory_generation/polynomial_optimization_linear.h>
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation/trajectory.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
+#include <mav_trajectory_generation_ros/ros_visualization.h>
+
 
 #include <Eigen/Dense>
 #include <nav_msgs/Odometry.h>
@@ -69,12 +73,12 @@ public:
 	ros::NodeHandle* nh_;
 	int planning = 1;
 
-	enum class PLANNING_TYPE {
+	enum class PLANNING_STEP {
 		TAKE_OFF,
-		ASTAR,
-		RRT,
-		NEWTON_EULER,
-		POTENTIAL_FIELD,
+		GLOBAL_PLANNING,
+		FOLLOW_TRAJECTORY,
+		LOCAL_PLANNING,
+		IDLE,
 		//MORE
 	};
 
@@ -96,8 +100,13 @@ public:
 	mavros_msgs::State d_current_state;
 	geometry_msgs::PoseStamped d_local_position;
 	geometry_msgs::PoseStamped d_previous_position;
+
 	sensor_msgs::NavSatFix d_global_position;
 	octomap_msgs::Octomap::ConstPtr octomap_msgs;
+
+
+	visualization_msgs::MarkerArray global_trajectory;
+	visualization_msgs::MarkerArray d_way_points;
 
 	// Saving init pose to home.
 	// geometry_msgs::PoseStamped target_position;
@@ -112,7 +121,7 @@ public:
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
 	void get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-  void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
+  	void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
 	void full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg);
 
 	void public_local_position();
@@ -121,7 +130,7 @@ public:
 
 private:
 	std::string m_worldFrameId = "/map";
-	PLANNING_TYPE planning_type = PLANNING_TYPE::TAKE_OFF;
+	PLANNING_STEP planning_type = PLANNING_STEP::TAKE_OFF;
 	PlanningClient *ros_client;
 
 	bool approaching = false;
@@ -147,14 +156,18 @@ private:
 	  // goal state
   	double _prev_goal[7];
 
-	nav_msgs::Path global_trajectory;
-
 	// Target_position
 	ros::Time start_time;
 	ros::Time pre_time;
 
 	long long worst_duration = 0;
 	long long best_duration = 100000000000000;
+
+	ompl::base::StateSpacePtr space;
+	ompl::base::SpaceInformationPtr si;
+	ompl::base::ProblemDefinitionPtr pdef;
+	mav_trajectory_generation::Trajectory trajectory;
+	mav_msgs::EigenTrajectoryPoint::Vector states;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

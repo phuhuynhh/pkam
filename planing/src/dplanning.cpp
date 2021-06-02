@@ -21,11 +21,8 @@
 #include <chrono>
 
 #include "path_planning/planning_setup.h"
-#include "ompl/geometric/PathGeometric.h"
 
 #include <octomap_msgs/Octomap.h>
-#include <mav_trajectory_generation_ros/ros_visualization.h>
-#include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -41,30 +38,7 @@ DPlanning::DPlanning(PlanningClient * ros_client){
 
 	this->nh_ = new ros::NodeHandle("~");
 	this->nh_->getParam("/dplanning/planning", this->planning);
-	global_trajectory.header.frame_id = "map";
-
-	switch(this->planning){
-		case 3:
-		{
-			this->grid = new Grid3D(400,400,100,0.8);
-			break;
-		}
-		case 2:
-		{
-			this->grid = new Grid3D(400,400,100,0.8);
-			break;
-		}
-		case 1:{
-			this->grid = new Grid3D(400,400,100,0.4);
-			break;
-		}
-		default:
-		{
-			this->grid = new Grid3D(400,400,100,0.4);
-			break;
-		}
-	}
-	this->grid->Initilize(octomap::point3d(0.0,0.0,0.0));
+	
  }
 
 void DPlanning::run(){
@@ -72,10 +46,10 @@ void DPlanning::run(){
 	//update the grid
 	tf::TransformListener m_tfListener;
 
-  pcl::PointCloud<pcl::PointXYZ> temp_cloud;
-	visualization_msgs::MarkerArray mkarr;
+  	pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+
 	if (octomap_activate){
-  pcl::fromROSMsg(octomap_cloud,temp_cloud);
+  	pcl::fromROSMsg(octomap_cloud,temp_cloud);
 
 
 	tf::StampedTransform sensorToWorldTf;
@@ -90,54 +64,31 @@ void DPlanning::run(){
 	pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
 	pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
 
-	this->grid->insertOctomapCloud(temp_cloud);
+	// this->grid->insertOctomapCloud(temp_cloud);
 	}
 	if (endpoint_active){
-		if (distance(d_local_position,endpoint_pos_ENU) < 0.2){
-			double travel_time = ros::Time::now().toSec() - start_time.toSec();
-			ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
-			ROS_INFO("Time : %f", travel_time);
-			ROS_INFO("Travel distance : %f", travel_cost);
-			ROS_INFO("Best exec time : %d", best_duration);
-			ROS_INFO("Worst exec time : %d", worst_duration);
-			endpoint_active = false;
-			ROS_INFO("Finished.");
-			// this->removeVisualize();
-			switch(this->planning){
-				case 3:
-				{
-					this->planning_type = PLANNING_TYPE::RRT;
-					break;
-				}
-				case 2:
-				{
-					this->planning_type = PLANNING_TYPE::ASTAR;
-					break;
-				}
-				case 1:{
-					this->planning_type = PLANNING_TYPE::POTENTIAL_FIELD;
-					break;
-				}
-				default:
-				{
-					this->planning_type = PLANNING_TYPE::POTENTIAL_FIELD;
-					break;
-				}
-			}
-			delete astar;
-			return;
-		}
-		double dt = ros::Time::now().toSec() - pre_time.toSec();
-		pre_time = ros::Time::now();
 		travel_cost += distance(d_local_position, d_previous_position);
 		d_previous_position = d_local_position;
 
-		global_trajectory.poses.push_back(d_local_position);
-		ros_client->global_traj_pub.publish(global_trajectory);
+		// global_trajectory.poses.push_back(d_local_position);
+		// ros_client->global_traj_pub.publish(global_trajectory);
 
 		switch(this->planning_type){
-			case PLANNING_TYPE::TAKE_OFF:
+			case PLANNING_STEP::TAKE_OFF:
 			{
+				if (distance(d_local_position,endpoint_pos_ENU) < 0.2){
+				double travel_time = ros::Time::now().toSec() - start_time.toSec();
+				ROS_INFO("Distance : %f", distance(d_local_position,endpoint_pos_ENU));
+				ROS_INFO("Time : %f", travel_time);
+				ROS_INFO("Travel distance : %f", travel_cost);
+				ROS_INFO("Best exec time : %d", best_duration);
+				ROS_INFO("Worst exec time : %d", worst_duration);
+				endpoint_active = false;
+				ROS_INFO("Finished.");
+				this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
+				break;
+			
+				}
 				geometry_msgs::Point start, end;
 				start.x = d_local_position.pose.position.x;
 				start.y = d_local_position.pose.position.y;
@@ -165,176 +116,41 @@ void DPlanning::run(){
 
 				break;
 			}
-			case PLANNING_TYPE::POTENTIAL_FIELD:
+			case PLANNING_STEP::LOCAL_PLANNING:
 			{
-				auto start = std::chrono::high_resolution_clock::now();
-				octomap::point3d v = this->apf->calculate_velocity(
-					octomap::point3d(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z),
-					octomap::point3d(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z)
-				);
-				auto end = std::chrono::high_resolution_clock::now();
-				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+				// auto start = std::chrono::high_resolution_clock::now();
+				// octomap::point3d v = this->apf->calculate_velocity(
+				// 	octomap::point3d(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z),
+				// 	octomap::point3d(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z)
+				// );
+				// auto end = std::chrono::high_resolution_clock::now();
+				// auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-				if(duration.count() >  worst_duration) worst_duration = duration.count();
-				if(duration.count() <  best_duration) best_duration = duration.count();
+				// if(duration.count() >  worst_duration) worst_duration = duration.count();
+				// if(duration.count() <  best_duration) best_duration = duration.count();
 
-				ROS_INFO("APF run time: %d", duration);
+				// ROS_INFO("APF run time: %d", duration);
 
-				setpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x + v.x();
-				setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + v.y();
-				setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + v.z();
+				// setpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x + v.x();
+				// setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + v.y();
+				// setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + v.z();
 
-				// publishVisualize();
-				ros_client->publish_position_to_controller(setpoint_pos_ENU);
+				// // publishVisualize();
+				// ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
 
 				break;
 			}
-			case PLANNING_TYPE::ASTAR:
+			case PLANNING_STEP::GLOBAL_PLANNING:
 			{
-				std::vector<int> path;
-
-				auto start = std::chrono::high_resolution_clock::now();
-				bool find = astar->find_path(octomap::point3d(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z),
-					path, 1000);
-				auto end = std::chrono::high_resolution_clock::now();
-				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-				ROS_INFO("Astar run time: %d", duration);
-
-				if(duration.count() >  worst_duration) worst_duration = duration.count();
-				if(duration.count() <  best_duration) best_duration = duration.count();
-
-				if(find){
-						if(path.size() == 0){
-							ros_client->publish_position_to_controller(endpoint_pos_ENU);
-						}
-						else{
-							octomap::point3d newpos = grid->toPosition(path[0]);
-							octomap::point3d nowpos(d_local_position.pose.position.x,
-							d_local_position.pose.position.y,
-						d_local_position.pose.position.z);
-							octomap::point3d nextpos = newpos - nowpos;
-							nextpos.normalize();
-							nextpos = nextpos*0.5;
-							nextpos = nowpos + nextpos;
-							setpoint_pos_ENU.pose.position.x = nextpos.x();
-							setpoint_pos_ENU.pose.position.y = nextpos.y();
-							setpoint_pos_ENU.pose.position.z = nextpos.z();
-							ros_client->publish_position_to_controller(setpoint_pos_ENU);
-
-							int marr_index = 0;
-
-							for(std::vector<int>::const_iterator it = path.begin(); it != path.end(); ++it){
-								octomap::point3d position = grid->toPosition(*it);
-								visualization_msgs::Marker mk;
-								mk.id = marr_index;
-								mk.type = mk.CUBE;
-								marr_index += 1;
-								mk.header.frame_id = "map";
-								mk.pose.position.x = position.x();
-								mk.pose.position.y = position.y();
-								mk.pose.position.z = position.z();
-								mk.color.r = 1.0;
-								mk.color.a = 1.0;
-								mk.scale.x = 0.2;
-								mk.scale.y = 0.2;
-								mk.scale.z = 0.2;
-								mkarr.markers.push_back(mk);
-							}
-							ros_client->grid_marker_pub.publish(mkarr);
-						}
-					}
-					else{
-						ROS_INFO("ASTAR FAILED TO GENERATE PATH");
-					}
-					break;
-			}
-			case PLANNING_TYPE::RRT:
-			{
-
-				// Create way to enter end_point target position ~ Assign Khang VO.
-				/*
-				//Clean code.
-
-
-				ros_client->publish_position_to_controller(d_local_position);
-				
-				PlanningSetup planning_setup;
-				planning_setup.setOctomapValidator(this->octomap_msgs);
-				
-				ompl::base::RealVectorBounds bounds(3);
-				
-				bounds.setLow(0, -20);
-    		bounds.setLow(1, -20);
-    		bounds.setLow(2, -20);
-				
-    		bounds.setHigh(0, 20);
-    		bounds.setHigh(1, 20);
-    		bounds.setHigh(2, 20);
-				planning_setup.getStateSpace()->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
-				
-				
-				ompl::base::ScopedState<ompl::base::SE3StateSpace> start_ompl(
-		 					planning_setup.getSpaceInformation());
- 	 			ompl::base::ScopedState<ompl::base::SE3StateSpace> goal_ompl(
-		 					planning_setup.getSpaceInformation());
-				
-				start_ompl->setXYZ(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
-				start_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				
-				goal_ompl->setXYZ(endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
-				goal_ompl->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				
-				planning_setup.setStartState(start_ompl);
-				planning_setup.setGoalState(goal_ompl);
-				
-				planning_setup.setDefaultObjective();
-				
-				planning_setup.setRrtStar();
-				planning_setup.setup();
-				planning_setup.solve(0.05);
-				
-				if(planning_setup.haveSolutionPath()){
-					int marr_index = 0;
-				
-					og::PathGeometric path = planning_setup.getSolutionPath();
-					for(std::size_t path_idx = 0; path_idx < path.getStateCount(); path_idx++){
-						const ob::SE3StateSpace::StateType *state = path.getState(path_idx)->as<ob::SE3StateSpace::StateType>();
-						const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>(0);
-						const ob::SO3StateSpace::StateType *rot = state->as<ob::SO3StateSpace::StateType>(1);
-				
-						visualization_msgs::Marker mk;
-						mk.id = marr_index;
-						mk.type = mk.CUBE;
-						marr_index += 1;
-						mk.header.frame_id = "map";
-						mk.pose.position.x = pos->values[0];
-						mk.pose.position.y = pos->values[1];
-						mk.pose.position.z = pos->values[2];
-						mk.color.r = 1.0;
-						mk.color.a = 1.0;
-						mk.scale.x = 0.2;
-						mk.scale.y = 0.2;
-						mk.scale.z = 0.2;
-						mkarr.markers.push_back(mk);
-					}
-				
-					ros_client->grid_marker_pub.publish(mkarr);
-				}
-				else{
-					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
-				}
-
-				*/
-
-				ob::StateSpacePtr space = ob::StateSpacePtr(new ob::SE3StateSpace());
+				global_trajectory.markers.clear();
+				d_way_points.markers.clear();
+				space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
 				// create a start state
 				ob::ScopedState<ob::SE3StateSpace> start(space);
-
 				// create a goal state
 				ob::ScopedState<ob::SE3StateSpace> goal(space);
-
 				// set the bounds for the R^3 part of SE(3)
 				ob::RealVectorBounds bounds(3);
 
@@ -349,14 +165,11 @@ void DPlanning::run(){
 				space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
 				// construct an instance of  space information from this state space
-				ob::SpaceInformationPtr si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
-
+				si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
 				start->setXYZ(d_local_position.pose.position.x,
 											d_local_position.pose.position.y,
 											d_local_position.pose.position.z);
-				start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-				// start.random();
-
+				start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();				// start.random();
 				goal->setXYZ(	endpoint_pos_ENU.pose.position.x,
 											endpoint_pos_ENU.pose.position.y,
 											endpoint_pos_ENU.pose.position.z);
@@ -368,30 +181,38 @@ void DPlanning::run(){
 				si->setStateValidityChecker(validity_checker);
 
 				// create a problem instance
-				ob::ProblemDefinitionPtr pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
-
+				pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
 				// set the start and goal states
 				pdef->setStartAndGoalStates(start, goal);
-
 			    // set Optimizattion objective
 				ob::OptimizationObjectivePtr obj(new ob::PathLengthOptimizationObjective(si));
 				obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
-
 				pdef->setOptimizationObjective(obj);
 
 				ob::PlannerPtr plan(new og::RRTstar(si));
-
 	    	// set the problem we are trying to solve for the planner
 				plan->setProblemDefinition(pdef);
-
 			    // perform setup steps for the planner
 				plan->setup();
-
 			    // attempt to solve the problem within one second of planning time
 				ob::PlannerStatus solved = plan->solve(2);
 
 				if(solved){
 					int marr_index = 0;
+
+					// Path smoothing using bspline
+					ompl::geometric::PathSimplifier* pathBSpline = new ompl::geometric::PathSimplifier(si);
+					ompl::geometric::PathGeometric* _path_smooth = new ompl::geometric::PathGeometric(
+						dynamic_cast<const ompl::geometric::PathGeometric&>(*pdef->getSolutionPath()));
+
+					ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+					// Using 5, as is the default value of the function
+					// If the path is not smooth, the value of smoothness() will be closer to 1
+					int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+					pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+    				ROS_INFO("Smoothed Path\n");
+    				_path_smooth->print(std::cout);
 
 					mav_trajectory_generation::NonlinearOptimizationParameters parameters;
 					mav_trajectory_generation ::Vertex::Vector vertices;
@@ -403,15 +224,31 @@ void DPlanning::run(){
 					mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 
+
 					og::PathGeometric* path = pdef->getSolutionPath()->as<og::PathGeometric>();
-					for(std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++){
-						const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+					for(std::size_t path_idx = 0; path_idx < _path_smooth->getStateCount(); path_idx++){
+						const ob::SE3StateSpace::StateType *se3state = _path_smooth->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
 
 						// extract the first component of the state and cast it to what we expect
 						const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
 
 						// extract the second component of the state and cast it to what we expect
 						const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+						visualization_msgs::Marker mk;
+						mk.id = marr_index;
+						mk.type = mk.CUBE;
+						marr_index += 1;
+						mk.header.frame_id = "map";
+						mk.pose.position.x = pos->values[0];
+						mk.pose.position.y = pos->values[1];
+						mk.pose.position.z = pos->values[2];
+						mk.color.r = 1.0;
+						mk.color.a = 1.0;
+						mk.scale.x = 0.2;
+						mk.scale.y = 0.2;
+						mk.scale.z = 0.2;
+						this->d_way_points.markers.push_back(mk);
 
 						if(path_idx == 0){
 							start.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
@@ -422,7 +259,7 @@ void DPlanning::run(){
 						else if(path_idx == path->getStateCount() - 1){
 							end.makeStartOrEnd(Eigen::Vector3d(pos->values[0],pos->values[1],pos->values[2]), derivative_to_optimize);
 							// set start point's velocity to be constrained to current velocity
-							end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d(1,1,0.1));
+							end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,Eigen::Vector3d(0,0,0));
 							vertices.push_back(end);
 						}
 						else{
@@ -434,48 +271,70 @@ void DPlanning::run(){
 
 					// setimate initial segment times
   					std::vector<double> segment_times;
-  					segment_times = estimateSegmentTimes(vertices, 2.0, 2.0);
+  					segment_times = estimateSegmentTimes(vertices, 3.0, 1.0);
 						// set up optimization problem
 					const int N = 10;
 					mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 					opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 					 // constrain velocity and acceleration
-  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 2.0);
-  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 2.0);
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 3.0);
+  					opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
 
   					// solve trajectory
   					opt.optimize();
-
- 					mav_trajectory_generation::Trajectory trajectory;
 					opt.getTrajectory(&trajectory);
-					ros_client->grid_marker_pub.publish(mkarr);
 
-					mav_msgs::EigenTrajectoryPoint::Vector states;
-					//use it for controller.
+					// use it for controller.
 					// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
 					// in EigenTrajectoryPoint struct 
 					// TODO : having topic for this structure ~ Assign Phu HUYNH.
 
 
 					// Whole trajectory:
-					double sampling_interval = 0.01;
+					double sampling_interval = 0.05;
 					bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
 
 					double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 					std::string frame_id = "map";
 
-					// From Trajectory class:
-					mav_trajectory_generation::drawMavTrajectory(trajectory, 0.0, frame_id, &mkarr);
-					ros_client->grid_marker_pub.publish(mkarr);
+					// From Trajectory class:             
+					mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);                                                                                                                                                                                                                                                                                                                                                                                                                                     
+					ros_client->way_points_pub.publish(d_way_points);
+					ros_client->global_traj_pub.publish(global_trajectory);
+					pre_time = ros::Time::now();
+					this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
 					break;
-
 				}
 				else{
 					ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
 				}
+				break;
+			}
+			case PLANNING_STEP::FOLLOW_TRAJECTORY:
+			{
+				double dt = ros::Time::now().toSec() - pre_time.toSec();
+				int derivative_order = mav_trajectory_generation::derivative_order::POSITION;
+				if(dt > trajectory.getMaxTime()){				
+					endpoint_active = false;
+					ROS_INFO("Finished.");
+					this->planning_type = PLANNING_STEP::IDLE;
+					break;			
+				
+				}
+				Eigen::VectorXd sample = trajectory.evaluate(dt, derivative_order);
 
+				setpoint_pos_ENU.pose.position.x = sample(0);
+				setpoint_pos_ENU.pose.position.y = sample(1);
+				setpoint_pos_ENU.pose.position.z = sample(2);
 
+				// publishVisualize();
+				ros_client->publish_position_to_controller(setpoint_pos_ENU);
+				break;
+			}
+			case PLANNING_STEP::IDLE:
+			{
+				ROS_INFO("Target reach. Waiting for command");
 				break;
 			}
 		}
@@ -533,18 +392,17 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 		startpoint_pos_ENU = d_local_position;
 		d_previous_position = d_local_position;
 		travel_cost = 0.0;
-		astar = new Astar(
-			octomap::point3d(endpoint_pos_ENU.pose.position.x,
-				endpoint_pos_ENU.pose.position.y,
-				endpoint_pos_ENU.pose.position.z),
-			this->grid);
-		apf = new APF(this->grid);
+		// astar = new Astar(
+		// 	octomap::point3d(endpoint_pos_ENU.pose.position.x,
+		// 		endpoint_pos_ENU.pose.position.y,
+		// 		endpoint_pos_ENU.pose.position.z),
+		// 	this->grid);
+		// apf = new APF(this->grid);
 		// publishVisualize();
 
 		endpoint_active = true;
 		best_duration = 1000000000000;
 		worst_duration = 0;
-		global_trajectory.poses.clear();
 	}
 }
 
