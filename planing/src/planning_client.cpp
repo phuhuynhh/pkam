@@ -44,14 +44,13 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	* with this propose we can change velocity and acceleration run time and add pid controller.
 	*/
 	getpoint_target_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, &DPlanning::get_target_position_callback, drone_planing);
-
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
 
 	// Visualizer Marker
 	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
-	global_traj_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/trajectory", 10);
-	global_traj_pub = nh_->advertise<nav_msgs::Path>("/planning/real_trajectory", 10);
+	way_points_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/way_points", 10);
+	global_traj_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/generated_trajectory", 10);
 	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
 }
