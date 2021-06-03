@@ -1,20 +1,5 @@
 #include "planning_client.h"
-#include "std_msgs/Int8.h"
 
-#include <ros/ros.h>
-#include <mavros_msgs/State.h>
-#include <mavros_msgs/GlobalPositionTarget.h>
-#include <geometry_msgs/PoseArray.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/TransformStamped.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <std_msgs/String.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <nav_msgs/Path.h>
-
-#include <octomap/octomap.h>
-#include <octomap_msgs/Octomap.h>
 
 PlanningClient::PlanningClient(int &argc, char **argv)
 {
@@ -30,7 +15,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planing);
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
-	//TODO : Need subcrible vel,acc for adding constraint.
+	
 
 	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
 	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planing);
@@ -48,6 +33,8 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	getpoint_target_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, &DPlanning::get_target_position_callback, drone_planing);
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
+	//TODO : Need subcrible vel,acc for adding constraint.
+	raw_reference_pub = nh_->advertise<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10);
 
 	// Visualizer Marker
 	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
@@ -63,4 +50,8 @@ void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseSta
 
 	printf("next position (x,y,z) : (%f, %f, %f) \n",
 		setpoint_pos_ENU.pose.position.x,  setpoint_pos_ENU.pose.position.y,  setpoint_pos_ENU.pose.position.z);
+}
+
+void PlanningClient::publish_raw_position_target(const mavros_msgs::PositionTarget& raw_pos_target){
+	raw_reference_pub.publish(raw_pos_target);
 }

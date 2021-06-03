@@ -1,12 +1,5 @@
 #include "dcontroller.h"
 
-#include <mavros_msgs/CommandTOL.h>
-#include <mavros_msgs/SetMode.h>
-#include <mavros_msgs/GlobalPositionTarget.h>
-#include <tf/tf.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2_ros/static_transform_broadcaster.h>
-#include <tf2_ros/transform_broadcaster.h>
 
 DController::DController(ControlClient *ros_client,ros::Rate *rate)
 {
@@ -142,8 +135,15 @@ void DController::land()
 	ROS_INFO("Trying to land");
 	while(!(ros_client->land_client.call(land_cmd) && land_cmd.response.success))
 	{
-		public_local_position();
-
+		switch (control_type)
+		{
+		case (CONTROL_TYPE::POSITION):
+			public_local_position();
+			break;
+		default:
+			public_raw_target();
+			break;
+		}
 		ros::spinOnce();
 		ROS_WARN("Retrying to land");
 		rate_->sleep();
@@ -165,16 +165,17 @@ void DController::land()
 }
 
 
-
 void DController::public_local_position(){
 	ros_client->setpoint_pos_local_pub.publish(setpoint_pos_ENU);
 }
 
+void DController::public_raw_target(){
+	ros_client->setpoint_raw_pub.publish(setpoint_raw_target);
+}
 
 
-//
+
 //  Callback for subcriber.
-//
 
 void DController::state_callback(const mavros_msgs::State::ConstPtr &msg)
 {
@@ -222,10 +223,14 @@ void DController::global_position_callback(const sensor_msgs::NavSatFix::ConstPt
 void DController::getpoint_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
 	// if(approaching && !endpoint_active) return;
+	control_type = CONTROL_TYPE::POSITION;
 	setpoint_pos_ENU = *msg;
 }
 
-
+void DController::getpoint_raw_callback(const mavros_msgs::PositionTarget::ConstPtr &msg){
+	control_type = CONTROL_TYPE::RAW;
+	setpoint_raw_target = *msg;
+}
 
 
 void DController::offboardStatusLooper(const ros::TimerEvent &event){

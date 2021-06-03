@@ -27,6 +27,9 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <mavros_msgs/PositionTarget.h>
+
+
 #include <std_srvs/SetBool.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
