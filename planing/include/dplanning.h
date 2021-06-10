@@ -4,39 +4,68 @@
 
 #include "planning_client.h"
 #include "grid/Grid3D.h"
-#include "path_planning/APF.h"
+#include "ewok/ed_ring_buffer.hpp"
+#include "ewok/raycast_ring_buffer.hpp"
+#include "ewok/ring_buffer_base.hpp"
 
-#include <ros/ros.h>
-#include <ros/subscribe_options.h>
-#include <tf/transform_broadcaster.h>
+
+#include "path_planning/APF.h"
+#include "path_planning/Astar.h"
+#include "path_planning/planning_setup.h"
+
 
 #include <stdio.h>
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <cmath>
+#include <string>
+#include <chrono>
+
+
+#include <ros/ros.h>
+#include <ros/subscribe_options.h>
+
+
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/time_synchronizer.h>
+
+#include <tf/tf.h>
+#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 #include <nav_msgs/Path.h>
 #include <std_msgs/Float32.h>
 #include <Eigen/Dense>
 
 #include <mavros_msgs/State.h>
+#include <mavros_msgs/PositionTarget.h>
+#include <mavros_msgs/GlobalPositionTarget.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <tf2_ros/transform_listener.h>
-
-#include <mavros_msgs/PositionTarget.h>
 
 
 #include <std_srvs/SetBool.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include "path_planning/Astar.h"
-#include <nav_msgs/Path.h>
-#include <chrono>
 
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/conversions.h>
+#include <pcl_ros/transforms.h>
+
+#include <octomap/octomap.h>
 #include <octomap_msgs/Octomap.h>
 
 #include <ompl/base/spaces/SE3StateSpace.h>
@@ -47,13 +76,14 @@
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 #include <ompl/geometric/planners/rrt/InformedRRTstar.h>
 #include <ompl/geometric/SimpleSetup.h>
-#include "ompl/geometric/PathGeometric.h"
+#include <ompl/geometric/PathGeometric.h>
 
 #include <mav_trajectory_generation/polynomial_optimization_linear.h>
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation/trajectory.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
 #include <mav_trajectory_generation_ros/ros_visualization.h>
+
 
 
 #include <Eigen/Dense>
@@ -64,6 +94,12 @@ class PlanningClient;
 class Grid3D;
 class APF;
 class Astar;
+class EuclideanDistanceRingBuffer;
+class RaycastRingBuffer;
+class RingBufferBase;
+
+using namespace message_filters;
+
 
 class DPlanning {
 public:
@@ -89,6 +125,13 @@ public:
 	DPlanning(PlanningClient *ros_client);
 	DPlanning(PlanningClient *ros_client,ros::Rate *rate);
 
+	// typedef sync_policies::ApproximateTime<nav_msgs::Odometry, sensor_msgs::PointCloud2> MySyncPolicy;
+	// typedef Synchronizer<MySyncPolicy> Sync;
+	// boost::shared_ptr<Sync> sync;
+
+
+
+
 	static constexpr bool  KEEP_ALIVE = true;
 	static constexpr float DEFAULT_VELOCITY = 0.3f;
 	static constexpr float ROS_RATE = 20.0;
@@ -97,12 +140,20 @@ public:
 	ros::Rate *rate_;
 	tf2_ros::Buffer tfBuffer_;
 
+	bool initialized = false;
+	const double resolution = 0.3;
+	static const int POW = 4;
+	static const int N = (1 << POW);
+	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::Ptr rrb;
+
 
 
 	//d_ ~ mean Drone message.
 	mavros_msgs::State d_current_state;
 	geometry_msgs::PoseStamped d_local_position;
 	geometry_msgs::PoseStamped d_previous_position;
+
+	nav_msgs::Odometry d_local_odometry;
 
 	sensor_msgs::NavSatFix d_global_position;
 	octomap_msgs::Octomap::ConstPtr octomap_msgs;
@@ -124,8 +175,13 @@ public:
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
 	void get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-  	void octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
+  	void bin_octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
 	void full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg);
+
+	void pointcloud2_callback(const sensor_msgs::PointCloud2::ConstPtr &cloud);
+	void local_odom_callback(const nav_msgs::Odometry::ConstPtr &odom);
+
+	void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud);
 
 	void public_local_position();
 	void run();
@@ -141,7 +197,6 @@ private:
 	bool octomap_activate = false;
 
 	visualization_msgs::Marker points, velocity_vector, global_trajectory_line;
-
 	double vx = 0.5;
 	double vy = 0.5;
 	double vz = 0.5;
@@ -149,9 +204,13 @@ private:
 
 	// Use this param for ros_client->setpoint_pos_local_pub()
 	geometry_msgs::PoseStamped setpoint_pos_ENU;
+	mavros_msgs::PositionTarget setpoint_raw;
+
+
 	geometry_msgs::PoseStamped startpoint_pos_ENU;
-	geometry_msgs::PoseStamped endpoint_pos_ENU; //
+	geometry_msgs::PoseStamped endpoint_pos_ENU; 
 	sensor_msgs::PointCloud2 octomap_cloud;
+
 
 	// Space bounds
   	double _min_bounds[3];

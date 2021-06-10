@@ -291,6 +291,14 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /ring_buffer/occupied
+      Name: Marker
+      Namespaces:
+        ring_buffer_occupied: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 238; 238; 236
@@ -334,10 +342,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: -0.010204075835645199
+      Pitch: 0.054795924574136734
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 2.617213726043701
+      Yaw: 2.4572150707244873
     Saved: ~
 Window Geometry:
   Color:

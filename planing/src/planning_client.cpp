@@ -1,24 +1,27 @@
 #include "planning_client.h"
 
+using namespace message_filters;
 
-PlanningClient::PlanningClient(int &argc, char **argv)
-{
-	this->nh_ = new ros::NodeHandle();
 
-	avoidCollision_ = false;
+PlanningClient::PlanningClient(ros::NodeHandle &node_handle){
+	this->nh_ = &node_handle;
 }
 
 
-void PlanningClient::init(DPlanning *const drone_planing){
+void PlanningClient::init(DPlanning *const drone_planning){
 
 	//For Mavros Subcriber Data.
-	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planing);
-	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planing);
-	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planing);
+	state_sub = nh_->subscribe<mavros_msgs::State>("/mavros/state", 10, &DPlanning::state_callback, drone_planning);
+	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planning);
+	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planning);
 	
+	
+	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::bin_octomap_callback, drone_planning);
+	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planning);
 
-	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::octomap_callback, drone_planing);
-	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planing);
+	//for local map
+	// odom_sub = nh_->subscribe<nav_msgs::Odometry>("/mavros/local_position/odom",10,&DPlanning::local_odom_callback, drone_planning);
+	// pointcloud_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points",10,&DPlanning::pointcloud2_callback, drone_planning);
 
 	//For Planning process
 	/**
@@ -30,11 +33,25 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	* quaternion (TODO).
 	* with this propose we can change velocity and acceleration run time and add pid controller.
 	*/
-	getpoint_target_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, &DPlanning::get_target_position_callback, drone_planing);
+	getpoint_target_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, &DPlanning::get_target_position_callback, drone_planning);
 	//Set point for drone Movement.
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
 	//TODO : Need subcrible vel,acc for adding constraint.
 	raw_reference_pub = nh_->advertise<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10);
+
+
+
+	// ringbuffer visualizer
+    occ_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/occupied", 5, true);
+    free_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/free", 5, true);
+    dist_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/distance", 5, true);
+
+	// message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh, "/mavros/local_position/odom", 1);
+    // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh, "/camera/depth/color/points", 1);
+    // typedef sync_policies::ApproximateTime<nav_msgs::Odometry, sensor_msgs::PointCloud2> MySyncPolicy;
+    // Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), odom_sub, pcl_sub);
+    // sync.registerCallback(boost::bind(&DPLanning::odomCloudCallback,drone_planning, _1, _2));
+
 
 	// Visualizer Marker
 	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
@@ -42,7 +59,7 @@ void PlanningClient::init(DPlanning *const drone_planing){
 	global_traj_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/generated_trajectory", 10);
 	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
-}\
+}
 
 //Not need spinOnce() in here, in planning_node already had.
 void PlanningClient::publish_position_to_controller(const geometry_msgs::PoseStamped& setpoint_pos_ENU){

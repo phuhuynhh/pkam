@@ -1,31 +1,12 @@
 #include "dplanning.h"
 
-#include <cmath>
-#include <mavros_msgs/GlobalPositionTarget.h>
-#include <tf/tf.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2_ros/static_transform_broadcaster.h>
-#include <tf2_ros/transform_broadcaster.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <sensor_msgs/PointCloud2.h>
 
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/PCLPointCloud2.h>
-#include <pcl/conversions.h>
-#include <pcl_ros/transforms.h>
 
-#include <octomap/octomap.h>
-#include "path_planning/Astar.h"
-#include <string>
-#include <chrono>
-
-#include "path_planning/planning_setup.h"
-
-#include <octomap_msgs/Octomap.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
+
+
 
 DPlanning::DPlanning(PlanningClient *ros_client)
 {
@@ -34,16 +15,26 @@ DPlanning::DPlanning(PlanningClient *ros_client)
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	this->rate_ = new ros::Rate(ROS_RATE);
+	this->rrb.reset(new ewok::EuclideanDistanceRingBuffer<POW, int16_t, float,uint8_t>(0.3, 1.0));
 
 	static tf2_ros::TransformListener tfListener(tfBuffer_);
 
 	this->nh_ = new ros::NodeHandle("~");
 	this->nh_->getParam("/dplanning/planning", this->planning);
+
+	// synchronized subscriber for pointcloud and odometry
+    // message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh_, "/mavros/local_position/odom", 1);
+    // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh_, "/camera/depth/color/points", 1);
+	// sync.reset(new Sync(MySyncPolicy(10), odom_sub, pcl_sub));      
+	// sync->registerCallback(boost::bind(&DPlanning::odomCloudCallback, this, _1, _2));
 }
 
 void DPlanning::run()
 {
 
+	// Main thread in 20Hz.
+	while(ros::ok())
+	{
 	//update the grid
 	tf::TransformListener m_tfListener;
 
@@ -170,7 +161,7 @@ void DPlanning::run()
 			bounds.setLow(1, -20);
 			bounds.setHigh(1, 20);
 			bounds.setLow(2, 0);
-			bounds.setHigh(2, 10);
+			bounds.setHigh(2, 4);
 
 			space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -291,7 +282,7 @@ void DPlanning::run()
 				opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 				// constrain velocity and acceleration
-				opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 3.0);
+				opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
 				opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
 
 				// solve trajectory
@@ -341,22 +332,22 @@ void DPlanning::run()
 			Eigen::VectorXd acce_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
 
 			//PositionTarget Message Format.
-			mavros_msgs::PositionTarget msg;
-			msg.header.stamp = ros::Time::now();
-			msg.header.frame_id = "map";
-			msg.type_mask = 0;
-			msg.position.x = position_d(0);
-			msg.position.y = position_d(1);
-			msg.position.z = position_d(2);
-			msg.velocity.x = vel_d(0);
-			msg.velocity.y = vel_d(1);
-			msg.velocity.z = vel_d(2);
-			msg.acceleration_or_force.x = acce_d(0);
-			msg.acceleration_or_force.y = acce_d(1);
-			msg.acceleration_or_force.z = acce_d(2);
+
+			setpoint_raw.header.stamp = ros::Time::now();
+			setpoint_raw.header.frame_id = "map";
+			setpoint_raw.type_mask = 0;
+			setpoint_raw.position.x = position_d(0);
+			setpoint_raw.position.y = position_d(1);
+			setpoint_raw.position.z = position_d(2);
+			setpoint_raw.velocity.x = vel_d(0);
+			setpoint_raw.velocity.y = vel_d(1);
+			setpoint_raw.velocity.z = vel_d(2);
+			setpoint_raw.acceleration_or_force.x = acce_d(0);
+			setpoint_raw.acceleration_or_force.y = acce_d(1);
+			setpoint_raw.acceleration_or_force.z = acce_d(2);
 
 			// publishVisualize();
-			ros_client->publish_raw_position_target(msg);
+			ros_client->publish_raw_position_target(setpoint_raw);
 			break;
 		}
 		case PLANNING_STEP::IDLE:
@@ -365,6 +356,13 @@ void DPlanning::run()
 			break;
 		}
 		}
+	}
+
+
+
+
+		ros::spinOnce();
+		rate_->sleep();
 	}
 }
 
@@ -435,7 +433,7 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 	}
 }
 
-void DPlanning::octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg)
+void DPlanning::bin_octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg)
 {
 	if (!octomap_activate)
 	{
@@ -449,6 +447,187 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 	this->octomap_msgs = msg;
 }
 
+void DPlanning::local_odom_callback(const nav_msgs::Odometry::ConstPtr &odom){
+	d_local_odometry = *odom;
+}
+
+void DPlanning::pointcloud2_callback(const sensor_msgs::PointCloud2::ConstPtr &cloud){
+	ROS_INFO("PCL callback");
+	/*
+	tf2::Quaternion q_orig, q_rot, q_new;
+    // Get the original orientation of 'commanded_pose'
+    tf2::convert(this->d_local_odometry.pose.pose.orientation , q_orig);
+
+    // for simulation iris rotate
+    q_rot.setRPY(-1.5, 0, -1.57);
+
+    q_new = q_rot*q_orig;  // Calculate the new orientation
+    q_new.normalize();
+
+    Eigen::Quaternionf q;
+    q.w() = q_new.getW();
+    q.x() = q_new.getX();
+    q.y() = q_new.getY();
+    q.z() = q_new.getZ();
+
+    // create transform matrix
+    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+    transform.block(0, 0, 3, 3) = Eigen::Matrix3f(q);
+    transform(0, 3) = this->d_local_odometry.pose.pose.position.x;
+    transform(1, 3) = this->d_local_odometry.pose.pose.position.y;
+    transform(2, 3) = this->d_local_odometry.pose.pose.position.z;
+    
+    // convert cloud to pcl form
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::fromROSMsg(*cloud, *cloud_in);
+    // transform to world frame
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::transformPointCloud(*cloud_in, *cloud_out, transform);
+
+    // compute ewol pointcloud and origin
+    Eigen::Vector3f origin = (transform * Eigen::Vector4f(0, 0, 0, 1)).head<3>();
+	if (isnan(origin(0)) || isnan(origin(1)) || isnan(origin(2)))
+	{
+		return;
+	}
+
+
+	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::PointCloud cloud_ew;
+
+    std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > points = cloud_out->points;
+	ROS_INFO_STREAM("Origin : " << origin.transpose());
+    printf("\npoint cloud size : %d\n", points.size());
+    for(int i = 0; i < points.size(); ++i)
+    {
+        if (isnan(points.at(i).x) || isnan(points.at(i).y) || isnan(points.at(i).z)){
+            continue;
+        }
+        // printf("(%f, %f, %f)",points.at(i).x, points.at(i).y, points.at(i).z);  
+        cloud_ew.push_back(Eigen::Vector4f(points.at(i).x, points.at(i).y, points.at(i).z, 0));
+    }
+
+    // initialize the ringbuffer map
+    if(!initialized)
+    {
+        Eigen::Vector3i idx;
+        rrb->getIdx(origin, idx);
+        ROS_INFO_STREAM("Origin: " << origin.transpose() << " idx " << idx.transpose());
+        rrb->setOffset(idx);
+        initialized = true;
+    }
+    else
+    {
+        Eigen::Vector3i origin_idx, offset, diff;
+        rrb->getIdx(origin, origin_idx);
+        offset = rrb->getVolumeCenter();
+        diff = origin_idx - offset;
+        if(diff.array().any()) rrb->moveVolume(diff.head<3>());
+    }
+
+    rrb->insertPointCloud(cloud_ew, origin);
+    rrb->updateDistance();
+
+    // visualize ringbuffer
+    visualization_msgs::Marker m_occ, m_free, m_dist, m_norm;
+    rrb->getMarkerOccupied(m_occ);
+    rrb->getMarkerFree(m_free);
+    rrb->getMarkerDistance(m_dist, 0.5);
+
+    ros_client->occ_marker_pub.publish(m_occ);
+    ros_client->free_marker_pub.publish(m_free);
+    ros_client->dist_marker_pub.publish(m_dist);
+
+	*/
+}
+
+void DPlanning::odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud){
+	// double elp = ros::Time::now().toSec() - _last_time.toSec();
+    // if(elp < (1 / map_rate)) return;
+	ROS_INFO("LocalMap");
+	/*
+
+    tf2::Quaternion q_orig, q_rot, q_new;
+    // Get the original orientation of 'commanded_pose'
+    tf2::convert(odom->pose.pose.orientation , q_orig);
+
+    // for simulation iris rotate
+    q_rot.setRPY(-1.5, 0, -1.57);
+
+    q_new = q_rot*q_orig;  // Calculate the new orientation
+    q_new.normalize();
+
+    Eigen::Quaternionf q;
+    q.w() = q_new.getW();
+    q.x() = q_new.getX();
+    q.y() = q_new.getY();
+    q.z() = q_new.getZ();
+
+    // create transform matrix
+    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+    transform.block(0, 0, 3, 3) = Eigen::Matrix3f(q);
+    transform(0, 3) = odom->pose.pose.position.x;
+    transform(1, 3) = odom->pose.pose.position.y;
+    transform(2, 3) = odom->pose.pose.position.z;
+    
+    // convert cloud to pcl form
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::fromROSMsg(*cloud, *cloud_in);
+    // transform to world frame
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::transformPointCloud(*cloud_in, *cloud_out, transform);
+
+    // compute ewol pointcloud and origin
+    Eigen::Vector3f origin = (transform * Eigen::Vector4f(0, 0, 0, 1)).head<3>();
+
+
+	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::PointCloud cloud_ew;
+
+    std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > points = cloud_out->points;
+    printf("point cloud size : %d", points.size());
+    for(int i = 0; i < points.size(); ++i)
+    {
+        if (isnan(points.at(i).x) || isnan(points.at(i).y) || isnan(points.at(i).z)){
+            continue;
+        }
+        // printf("(%f, %f, %f)",points.at(i).x, points.at(i).y, points.at(i).z);  
+        cloud_ew.push_back(Eigen::Vector4f(points.at(i).x, points.at(i).y, points.at(i).z, 0));
+    }
+
+    // initialize the ringbuffer map
+    if(!initialized)
+    {
+        Eigen::Vector3i idx;
+        rrb->getIdx(origin, idx);
+        ROS_INFO_STREAM("Origin: " << origin.transpose() << " idx " << idx.transpose());
+        rrb->setOffset(idx);
+        initialized = true;
+    }
+    else
+    {
+        Eigen::Vector3i origin_idx, offset, diff;
+        rrb->getIdx(origin, origin_idx);
+        offset = rrb->getVolumeCenter();
+        diff = origin_idx - offset;
+        if(diff.array().any()) rrb->moveVolume(diff.head<3>());
+    }
+
+    rrb->insertPointCloud(cloud_ew, origin);
+    rrb->updateDistance();
+
+    // visualize ringbuffer
+    visualization_msgs::Marker m_occ, m_free, m_dist, m_norm;
+    rrb->getMarkerOccupied(m_occ);
+    rrb->getMarkerFree(m_free);
+    rrb->getMarkerDistance(m_dist, 0.5);
+
+    ros_client->occ_marker_pub.publish(m_occ);
+    ros_client->free_marker_pub.publish(m_free);
+    ros_client->dist_marker_pub.publish(m_dist);
+
+    // _last_time = ros::Time::now();
+
+	*/
+}
 //
 //Util Method.
 //

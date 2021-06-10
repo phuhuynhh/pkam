@@ -7,6 +7,10 @@
 #include <std_msgs/String.h>
 #include <nav_msgs/Path.h>
 
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/time_synchronizer.h>
+
 #include <ros/ros.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/GlobalPositionTarget.h>
@@ -25,13 +29,14 @@
 
 
 
+using namespace message_filters;
 class DPlanning; // Forward declaration because of circular reference
 
 class PlanningClient
 {
   public:
-    PlanningClient(int &argc, char **argv);
-    PlanningClient(int &argc, char **argv, ros::NodeHandle *node_handle);
+    PlanningClient();
+    PlanningClient(ros::NodeHandle &node_handle);
 
 
     ros::Subscriber state_sub;
@@ -39,6 +44,8 @@ class PlanningClient
     ros::Subscriber global_pos_sub;
     ros::Subscriber local_octomap_sub;
     ros::Subscriber octomap_sub;
+    ros::Subscriber odom_sub;
+    ros::Subscriber pointcloud_sub;
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
@@ -53,6 +60,11 @@ class PlanningClient
     ros::Publisher global_traj_pub;
     ros::Publisher vel_marker_pub;
     ros::Publisher way_points_pub;
+
+    //Local-Map visualize marker
+    ros::Publisher occ_marker_pub;
+    ros::Publisher free_marker_pub;
+    ros::Publisher dist_marker_pub;
 
 
 

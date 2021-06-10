@@ -27,7 +27,6 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 
-find_package(catkin_simple REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(octomap REQUIRED)
 
@@ -41,6 +40,8 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+
+
 include_directories(
   include
   ${PCL_DEFINITIONS}
@@ -48,10 +49,14 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR} 
   ${OCTOMAP_INCLUDE_DIRS}}
 )
+include_directories(${PCL_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 
 # catkin_simple()
 
 add_executable(mapping_example src/mapping_node.cpp)
+
 
 target_link_libraries(mapping_example  ${PCL_LIBRARIES} ${catkin_LIBRARIES})
