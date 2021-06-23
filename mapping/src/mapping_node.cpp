@@ -2,6 +2,8 @@
 #include <ros/ros.h>
 #include <math.h>       /* isnan, sqrt */
 
+#include <std_msgs/Bool.h>
+
 
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
@@ -33,14 +35,17 @@ using namespace message_filters;
 // global declaration
 ros::Time _last_time;
 
+//LocalMap
 bool initialized = false;
 const double resolution = 0.2;
 static const int POW = 5;
 static const int N = (1 << POW);
 ewok::EuclideanDistanceRingBuffer<POW> rrb(resolution, 1.0);
 
+
+//Publisher
 ros::Publisher occ_marker_pub, free_marker_pub, dist_marker_pub, norm_marker_pub;
-ros::Publisher cloud2_pub, center_pub;
+ros::Publisher occ_trigger_pub, apf_force_pub; // can has more.
 
 double map_rate, pub_rate;
 std::string m_worldFrameId = "/map";
@@ -50,8 +55,6 @@ void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs
     double elp = ros::Time::now().toSec() - _last_time.toSec();
     // if(elp < (1 / map_rate)) return;
     
-
-
     tf2::Quaternion q_orig, q_rot, q_new;
     // Get the original orientation of 'commanded_pose'
     tf2::convert(odom->pose.pose.orientation , q_orig);
@@ -86,7 +89,8 @@ void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs
     Eigen::Vector3f origin = (transform * Eigen::Vector4f(0, 0, 0, 1)).head<3>();
     ewok::EuclideanDistanceRingBuffer<POW>::PointCloud cloud_ew;
     std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > points = cloud_out->points;
-    printf("point cloud size : %d", points.size());
+    // printf("point cloud size : %d", points.size());
+
     for(int i = 0; i < points.size(); ++i)
     {
         if (isnan(points.at(i).x) || isnan(points.at(i).y) || isnan(points.at(i).z)){
@@ -113,68 +117,48 @@ void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs
         diff = origin_idx - offset;
         if(diff.array().any()) rrb.moveVolume(diff.head<3>());
     }
-
     // insert point cloud to ringbuffer
-    ROS_INFO("Insert Point Cloud");
+    // ROS_INFO("Insert Point Cloud");
     rrb.insertPointCloud(cloud_ew, origin);
-    ROS_INFO("Update Distance");
+    // ROS_INFO("Update Distance");
     rrb.updateDistance();
-
     // visualize ringbuffer
     visualization_msgs::Marker m_occ, m_free, m_dist, m_norm;
     rrb.getMarkerOccupied(m_occ);
     rrb.getMarkerFree(m_free);
     rrb.getMarkerDistance(m_dist, 0.5);
-    // rrb.getMarkerNormal(m_norm);
 
     occ_marker_pub.publish(m_occ);
     free_marker_pub.publish(m_free);
     dist_marker_pub.publish(m_dist);
-    // norm_marker_pub.publish(m_norm);
 
     _last_time = ros::Time::now();
 }
 
 void timerCallback(const ros::TimerEvent& e)
 {
-    // if(!initialized) return;
+    if(!initialized) return;
+    ROS_INFO("Timer Trigger");
+    //TODO : Khang VO
+    //Calculate when drone met occupied -> send occ_trigger_pub = true.
+    //Calculate APF and send this force to apf_force_pub via PoseStamped.
 
-    // pcl::PointCloud<pcl::PointXYZ> cloud;
-    // Eigen::Vector3d center;
-    // // rrb.getBufferAsCloud(cloud, center);
-
-    // // convert to ROS message and publish
-    // sensor_msgs::PointCloud2 cloud2;
-    // pcl::toROSMsg(cloud, cloud2);
-
-    // geometry_msgs::PoseStamped pose;
-    // pose.pose.position.x = center(0);
-    // pose.pose.position.y = center(1);
-    // pose.pose.position.z = center(2);
-
-    // // message publish should have the same time stamp
-    // ros::Time stamp = ros::Time::now();
-    // pose.header.stamp = stamp;
-    // pose.header.frame_id = "map";
-    // cloud2.header.stamp = stamp;
-    // cloud2.header.frame_id = "map";
-
-    // cloud2_pub.publish(cloud2);
-    // center_pub.publish(pose);
 }
-
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "realtime_example");
+    ros::init(argc, argv, "local_mapping");
     ros::NodeHandle nh;
 
+    //Local Mapping Controller 
+    occ_trigger_pub = nh.advertise<std_msgs::Bool>("/mapping/has_occupied", 1, true);
+    apf_force_pub = nh.advertise<geometry_msgs::PoseStamped>("/mapping/potential_force", 1, true);
+
+
     // ringbuffer visualizer
-    occ_marker_pub = nh.advertise<visualization_msgs::Marker>("ring_buffer/occupied", 5, true);
-    free_marker_pub = nh.advertise<visualization_msgs::Marker>("ring_buffer/free", 5, true);
-    dist_marker_pub = nh.advertise<visualization_msgs::Marker>("ring_buffer/distance", 5, true);
-    norm_marker_pub = nh.advertise<visualization_msgs::Marker>("ring_buffer/normal", 5, true);
-    cloud2_pub = nh.advertise<sensor_msgs::PointCloud2>("ring_buffer/cloud2", 1, true);
-    center_pub = nh.advertise<geometry_msgs::PoseStamped>("ring_buffer/center", 1, true);
+    occ_marker_pub = nh.advertise<visualization_msgs::Marker>("/local_map_visualizer/occupied", 5, true);
+    free_marker_pub = nh.advertise<visualization_msgs::Marker>("/local_map_visualizer/free", 5, true);
+    dist_marker_pub = nh.advertise<visualization_msgs::Marker>("/local_map_visualizer/distance", 5, true);
+    norm_marker_pub = nh.advertise<visualization_msgs::Marker>("/local_map_visualizer/normal", 5, true);
 
     // synchronized subscriber for pointcloud and odometry
     message_filters::Subscriber<nav_msgs::Odometry> odom_sub(nh, "/mavros/local_position/odom", 1);
@@ -184,7 +168,7 @@ int main(int argc, char** argv)
     sync.registerCallback(boost::bind(&odomCloudCallback, _1, _2));
 
     // get parameter
-    nh.getParam("/dmappinge/map_rate", map_rate);
+    nh.getParam("/dmapping/map_rate", map_rate);
     nh.getParam("/dmapping/publish_rate", pub_rate);
     std::cout << map_rate << "," << pub_rate << std::endl;
 

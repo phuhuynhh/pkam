@@ -47,6 +47,11 @@ class PlanningClient
     ros::Subscriber odom_sub;
     ros::Subscriber pointcloud_sub;
 
+
+    //localmap
+    ros::Subscriber occ_trigger_sub;
+    ros::Subscriber apf_force_sub;
+
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
 

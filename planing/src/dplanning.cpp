@@ -15,7 +15,6 @@ DPlanning::DPlanning(PlanningClient *ros_client)
 
 	// The setpoint publishing rate MUST be faster than 2Hz
 	this->rate_ = new ros::Rate(ROS_RATE);
-	this->rrb.reset(new ewok::EuclideanDistanceRingBuffer<POW, int16_t, float,uint8_t>(0.3, 1.0));
 
 	static tf2_ros::TransformListener tfListener(tfBuffer_);
 
@@ -36,56 +35,56 @@ void DPlanning::run()
 	while(ros::ok())
 	{
 	//update the grid
-	tf::TransformListener m_tfListener;
+		tf::TransformListener m_tfListener;
 
-	pcl::PointCloud<pcl::PointXYZ> temp_cloud;
+		pcl::PointCloud<pcl::PointXYZ> temp_cloud;
 
-	if (octomap_activate)
-	{
-		pcl::fromROSMsg(octomap_cloud, temp_cloud);
-
-		tf::StampedTransform sensorToWorldTf;
-		try
+		if (octomap_activate)
 		{
-			m_tfListener.lookupTransform(m_worldFrameId, this->octomap_cloud.header.frame_id, this->octomap_cloud.header.stamp, sensorToWorldTf);
-		}
+			pcl::fromROSMsg(octomap_cloud, temp_cloud);
+
+			tf::StampedTransform sensorToWorldTf;
+			try
+			{
+				m_tfListener.lookupTransform(m_worldFrameId, this->octomap_cloud.header.frame_id, this->octomap_cloud.header.stamp, sensorToWorldTf);
+			}
 		catch (tf::TransformException &ex)
-		{
-			ROS_ERROR_STREAM("Transform error of sensor data: " << ex.what() << ", quitting callback");
-			return;
-		}
+			{
+				ROS_ERROR_STREAM("Transform error of sensor data: " << ex.what() << ", quitting callback");
+				return;
+			}
 
-		Eigen::Matrix4f sensorToWorld;
-		pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
-		pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
+			Eigen::Matrix4f sensorToWorld;
+			pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
+			pcl::transformPointCloud(temp_cloud, temp_cloud, sensorToWorld);
 
 		// this->grid->insertOctomapCloud(temp_cloud);
-	}
-	if (endpoint_active)
-	{
-		travel_cost += distance(d_local_position, d_previous_position);
-		d_previous_position = d_local_position;
+		}
+		if (endpoint_active)
+		{
+			travel_cost += distance(d_local_position, d_previous_position);
+			d_previous_position = d_local_position;
 
 		// global_trajectory.poses.push_back(d_local_position);
 		// ros_client->global_traj_pub.publish(global_trajectory);
 
-		switch (this->planning_type)
-		{
-		case PLANNING_STEP::TAKE_OFF:
-		{
-			if (distance(d_local_position, endpoint_pos_ENU) < 0.2)
+			switch (this->planning_type)
 			{
-				double travel_time = ros::Time::now().toSec() - start_time.toSec();
-				ROS_INFO("Distance : %f", distance(d_local_position, endpoint_pos_ENU));
-				ROS_INFO("Time : %f", travel_time);
-				ROS_INFO("Travel distance : %f", travel_cost);
-				ROS_INFO("Best exec time : %d", best_duration);
-				ROS_INFO("Worst exec time : %d", worst_duration);
-				endpoint_active = false;
-				ROS_INFO("Finished.");
-				this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
-				break;
-			}
+				case PLANNING_STEP::TAKE_OFF:
+				{
+					if (distance(d_local_position, endpoint_pos_ENU) < 0.2)
+					{
+						double travel_time = ros::Time::now().toSec() - start_time.toSec();
+						ROS_INFO("Distance : %f", distance(d_local_position, endpoint_pos_ENU));
+						ROS_INFO("Time : %f", travel_time);
+						ROS_INFO("Travel distance : %f", travel_cost);
+						ROS_INFO("Best exec time : %d", best_duration);
+						ROS_INFO("Worst exec time : %d", worst_duration);
+						endpoint_active = false;
+						ROS_INFO("Finished.");
+						this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
+						break;
+					}
 			/*
 				geometry_msgs::Point start, end;
 				start.x = d_local_position.pose.position.x;
@@ -113,12 +112,12 @@ void DPlanning::run()
 				*/
 
 			//Force take-off.
-			ros_client->publish_position_to_controller(endpoint_pos_ENU);
+					ros_client->publish_position_to_controller(endpoint_pos_ENU);
 
-			break;
-		}
-		case PLANNING_STEP::LOCAL_PLANNING:
-		{
+					break;
+				}
+				case PLANNING_STEP::LOCAL_PLANNING:
+				{
 			// auto start = std::chrono::high_resolution_clock::now();
 			// octomap::point3d v = this->apf->calculate_velocity(
 			// 	octomap::point3d(d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z),
@@ -139,41 +138,41 @@ void DPlanning::run()
 			// // publishVisualize();
 			// ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
-			break;
-		}
-		case PLANNING_STEP::GLOBAL_PLANNING:
-		{
-			global_trajectory.markers.clear();
-			d_way_points.markers.clear();
-			space = ob::StateSpacePtr(new ob::SE3StateSpace());
+					break;
+				}
+				case PLANNING_STEP::GLOBAL_PLANNING:
+				{
+					global_trajectory.markers.clear();
+					d_way_points.markers.clear();
+					space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
 			// create a start state
-			ob::ScopedState<ob::SE3StateSpace> start(space);
+					ob::ScopedState<ob::SE3StateSpace> start(space);
 			// create a goal state
-			ob::ScopedState<ob::SE3StateSpace> goal(space);
+					ob::ScopedState<ob::SE3StateSpace> goal(space);
 			// set the bounds for the R^3 part of SE(3)
-			ob::RealVectorBounds bounds(3);
+					ob::RealVectorBounds bounds(3);
 
 			//TODO : Assign Khang VO.
 			// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
-			bounds.setLow(0, -20);
-			bounds.setHigh(0, 20);
-			bounds.setLow(1, -20);
-			bounds.setHigh(1, 20);
-			bounds.setLow(2, 0);
-			bounds.setHigh(2, 4);
+					bounds.setLow(0, _min_bounds[0]);
+					bounds.setHigh(0, _max_bounds[0]);
+					bounds.setLow(1,  _min_bounds[1]);
+					bounds.setHigh(1,  _max_bounds[1]);
+					bounds.setLow(2, 0);
+					bounds.setHigh(2, 3);
 
-			space->as<ob::SE3StateSpace>()->setBounds(bounds);
+					space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
 			// construct an instance of  space information from this state space
-			si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
-			start->setXYZ(d_local_position.pose.position.x,
-						  d_local_position.pose.position.y,
-						  d_local_position.pose.position.z);
+					si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
+					start->setXYZ(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);
 			start->as<ob::SO3StateSpace::StateType>(1)->setIdentity(); // start.random();
 			goal->setXYZ(endpoint_pos_ENU.pose.position.x,
-						 endpoint_pos_ENU.pose.position.y,
-						 endpoint_pos_ENU.pose.position.z);
+				endpoint_pos_ENU.pose.position.y,
+				endpoint_pos_ENU.pose.position.z);
 			goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 			// goal.random();
 
@@ -203,18 +202,18 @@ void DPlanning::run()
 				int marr_index = 0;
 
 				// Path smoothing using bspline
-				ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
-				ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
-					dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+				// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+				// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+				// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
 
-				ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
-				// Using 5, as is the default value of the function
-				// If the path is not smooth, the value of smoothness() will be closer to 1
-				int bspline_steps = ceil(3 * _path_smooth->smoothness());
+				// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+				// // Using 5, as is the default value of the function
+				// // If the path is not smooth, the value of smoothness() will be closer to 1
+				// int bspline_steps = ceil(3 * _path_smooth->smoothness());
 
-				pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
-				ROS_INFO("Smoothed Path\n");
-				_path_smooth->print(std::cout);
+				// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+				// ROS_INFO("Smoothed Path\n");
+				// _path_smooth->print(std::cout);
 
 				mav_trajectory_generation::NonlinearOptimizationParameters parameters;
 				mav_trajectory_generation ::Vertex::Vector vertices;
@@ -226,9 +225,9 @@ void DPlanning::run()
 				mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 				og::PathGeometric *path = pdef->getSolutionPath()->as<og::PathGeometric>();
-				for (std::size_t path_idx = 0; path_idx < _path_smooth->getStateCount(); path_idx++)
+				for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
 				{
-					const ob::SE3StateSpace::StateType *se3state = _path_smooth->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+					const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
 
 					// extract the first component of the state and cast it to what we expect
 					const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
@@ -355,15 +354,15 @@ void DPlanning::run()
 			ROS_INFO("Target reach. Waiting for command");
 			break;
 		}
-		}
 	}
+}
 
 
 
 
-		ros::spinOnce();
-		rate_->sleep();
-	}
+ros::spinOnce();
+rate_->sleep();
+}
 }
 
 void DPlanning::state_callback(const mavros_msgs::State::ConstPtr &msg)
@@ -411,8 +410,8 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 	{
 		endpoint_pos_ENU = *msg;
 		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
-				 d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
-				 endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
+			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
+			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
 
 		start_time = ros::Time::now();
 		pre_time = ros::Time::now();
@@ -445,189 +444,46 @@ void DPlanning::bin_octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &m
 void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg)
 {
 	this->octomap_msgs = msg;
+
+	// ROS_INFO("OCTOMAP CALLBACK 1");
+	// // convert ColorOcTree to OcTree
+	// octomap::OcTree* tree_oct = reinterpret_cast<octomap::OcTree*>(tree_coloct);
+	octomap::OcTree* tree_oct = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
+	
+	tree_oct->getMetricMin(_min_bounds[0], _min_bounds[1], _min_bounds[2]);
+	tree_oct->getMetricMax(_max_bounds[0], _max_bounds[1], _max_bounds[2]);
 }
 
-void DPlanning::local_odom_callback(const nav_msgs::Odometry::ConstPtr &odom){
-	d_local_odometry = *odom;
+
+
+//local map callback
+//TODO : Khang VO
+void DPlanning::occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg){
+
 }
+void DPlanning::apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg){
 
-void DPlanning::pointcloud2_callback(const sensor_msgs::PointCloud2::ConstPtr &cloud){
-	ROS_INFO("PCL callback");
-	/*
-	tf2::Quaternion q_orig, q_rot, q_new;
-    // Get the original orientation of 'commanded_pose'
-    tf2::convert(this->d_local_odometry.pose.pose.orientation , q_orig);
-
-    // for simulation iris rotate
-    q_rot.setRPY(-1.5, 0, -1.57);
-
-    q_new = q_rot*q_orig;  // Calculate the new orientation
-    q_new.normalize();
-
-    Eigen::Quaternionf q;
-    q.w() = q_new.getW();
-    q.x() = q_new.getX();
-    q.y() = q_new.getY();
-    q.z() = q_new.getZ();
-
-    // create transform matrix
-    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-    transform.block(0, 0, 3, 3) = Eigen::Matrix3f(q);
-    transform(0, 3) = this->d_local_odometry.pose.pose.position.x;
-    transform(1, 3) = this->d_local_odometry.pose.pose.position.y;
-    transform(2, 3) = this->d_local_odometry.pose.pose.position.z;
-    
-    // convert cloud to pcl form
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>());
-    pcl::fromROSMsg(*cloud, *cloud_in);
-    // transform to world frame
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>());
-    pcl::transformPointCloud(*cloud_in, *cloud_out, transform);
-
-    // compute ewol pointcloud and origin
-    Eigen::Vector3f origin = (transform * Eigen::Vector4f(0, 0, 0, 1)).head<3>();
-	if (isnan(origin(0)) || isnan(origin(1)) || isnan(origin(2)))
-	{
-		return;
-	}
-
-
-	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::PointCloud cloud_ew;
-
-    std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > points = cloud_out->points;
-	ROS_INFO_STREAM("Origin : " << origin.transpose());
-    printf("\npoint cloud size : %d\n", points.size());
-    for(int i = 0; i < points.size(); ++i)
-    {
-        if (isnan(points.at(i).x) || isnan(points.at(i).y) || isnan(points.at(i).z)){
-            continue;
-        }
-        // printf("(%f, %f, %f)",points.at(i).x, points.at(i).y, points.at(i).z);  
-        cloud_ew.push_back(Eigen::Vector4f(points.at(i).x, points.at(i).y, points.at(i).z, 0));
-    }
-
-    // initialize the ringbuffer map
-    if(!initialized)
-    {
-        Eigen::Vector3i idx;
-        rrb->getIdx(origin, idx);
-        ROS_INFO_STREAM("Origin: " << origin.transpose() << " idx " << idx.transpose());
-        rrb->setOffset(idx);
-        initialized = true;
-    }
-    else
-    {
-        Eigen::Vector3i origin_idx, offset, diff;
-        rrb->getIdx(origin, origin_idx);
-        offset = rrb->getVolumeCenter();
-        diff = origin_idx - offset;
-        if(diff.array().any()) rrb->moveVolume(diff.head<3>());
-    }
-
-    rrb->insertPointCloud(cloud_ew, origin);
-    rrb->updateDistance();
-
-    // visualize ringbuffer
-    visualization_msgs::Marker m_occ, m_free, m_dist, m_norm;
-    rrb->getMarkerOccupied(m_occ);
-    rrb->getMarkerFree(m_free);
-    rrb->getMarkerDistance(m_dist, 0.5);
-
-    ros_client->occ_marker_pub.publish(m_occ);
-    ros_client->free_marker_pub.publish(m_free);
-    ros_client->dist_marker_pub.publish(m_dist);
-
-	*/
 }
-
-void DPlanning::odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud){
-	// double elp = ros::Time::now().toSec() - _last_time.toSec();
-    // if(elp < (1 / map_rate)) return;
-	ROS_INFO("LocalMap");
-	/*
-
-    tf2::Quaternion q_orig, q_rot, q_new;
-    // Get the original orientation of 'commanded_pose'
-    tf2::convert(odom->pose.pose.orientation , q_orig);
-
-    // for simulation iris rotate
-    q_rot.setRPY(-1.5, 0, -1.57);
-
-    q_new = q_rot*q_orig;  // Calculate the new orientation
-    q_new.normalize();
-
-    Eigen::Quaternionf q;
-    q.w() = q_new.getW();
-    q.x() = q_new.getX();
-    q.y() = q_new.getY();
-    q.z() = q_new.getZ();
-
-    // create transform matrix
-    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-    transform.block(0, 0, 3, 3) = Eigen::Matrix3f(q);
-    transform(0, 3) = odom->pose.pose.position.x;
-    transform(1, 3) = odom->pose.pose.position.y;
-    transform(2, 3) = odom->pose.pose.position.z;
-    
-    // convert cloud to pcl form
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>());
-    pcl::fromROSMsg(*cloud, *cloud_in);
-    // transform to world frame
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>());
-    pcl::transformPointCloud(*cloud_in, *cloud_out, transform);
-
-    // compute ewol pointcloud and origin
-    Eigen::Vector3f origin = (transform * Eigen::Vector4f(0, 0, 0, 1)).head<3>();
+	
 
 
-	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::PointCloud cloud_ew;
 
-    std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ> > points = cloud_out->points;
-    printf("point cloud size : %d", points.size());
-    for(int i = 0; i < points.size(); ++i)
-    {
-        if (isnan(points.at(i).x) || isnan(points.at(i).y) || isnan(points.at(i).z)){
-            continue;
-        }
-        // printf("(%f, %f, %f)",points.at(i).x, points.at(i).y, points.at(i).z);  
-        cloud_ew.push_back(Eigen::Vector4f(points.at(i).x, points.at(i).y, points.at(i).z, 0));
-    }
 
-    // initialize the ringbuffer map
-    if(!initialized)
-    {
-        Eigen::Vector3i idx;
-        rrb->getIdx(origin, idx);
-        ROS_INFO_STREAM("Origin: " << origin.transpose() << " idx " << idx.transpose());
-        rrb->setOffset(idx);
-        initialized = true;
-    }
-    else
-    {
-        Eigen::Vector3i origin_idx, offset, diff;
-        rrb->getIdx(origin, origin_idx);
-        offset = rrb->getVolumeCenter();
-        diff = origin_idx - offset;
-        if(diff.array().any()) rrb->moveVolume(diff.head<3>());
-    }
 
-    rrb->insertPointCloud(cloud_ew, origin);
-    rrb->updateDistance();
 
-    // visualize ringbuffer
-    visualization_msgs::Marker m_occ, m_free, m_dist, m_norm;
-    rrb->getMarkerOccupied(m_occ);
-    rrb->getMarkerFree(m_free);
-    rrb->getMarkerDistance(m_dist, 0.5);
 
-    ros_client->occ_marker_pub.publish(m_occ);
-    ros_client->free_marker_pub.publish(m_free);
-    ros_client->dist_marker_pub.publish(m_dist);
 
-    // _last_time = ros::Time::now();
 
-	*/
-}
+
+
+
+
+
+
+
+
+
+
 //
 //Util Method.
 //

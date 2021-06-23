@@ -41,3 +41,6 @@ roslaunch dcontroller sitl.launch
 
 
 ```
+- [x] Moving LocalMap to mapping_node
+- [ ] Occupied Trigger and APF in mapping_node
+- [ ] Check occupied and APF force in planning_Node
