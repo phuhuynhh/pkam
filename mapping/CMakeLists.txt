@@ -56,7 +56,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # catkin_simple()
 
-add_executable(mapping_example src/mapping_node.cpp)
+add_executable(mapping src/mapping_node.cpp)
 
 
-target_link_libraries(mapping_example  ${PCL_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(mapping  ${PCL_LIBRARIES} ${catkin_LIBRARIES})

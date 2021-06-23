@@ -23,6 +23,9 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	// odom_sub = nh_->subscribe<nav_msgs::Odometry>("/mavros/local_position/odom",10,&DPlanning::local_odom_callback, drone_planning);
 	// pointcloud_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points",10,&DPlanning::pointcloud2_callback, drone_planning);
 
+	occ_trigger_sub = nh_->subscribe<std_msgs::Bool>("/mapping/has_occupied",10,&DPlanning::occ_trigger_callback, drone_planning);
+	apf_force_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mapping/potential_force",10,&DPlanning::apf_force_callback, drone_planning);
+
 	//For Planning process
 	/**
 	* Trajectory get endpoint_position and create Movement Array
@@ -39,12 +42,6 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	//TODO : Need subcrible vel,acc for adding constraint.
 	raw_reference_pub = nh_->advertise<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10);
 
-
-
-	// ringbuffer visualizer
-    occ_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/occupied", 5, true);
-    free_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/free", 5, true);
-    dist_marker_pub = nh_->advertise<visualization_msgs::Marker>("ring_buffer/distance", 5, true);
 
 	// message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh, "/mavros/local_position/odom", 1);
     // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh, "/camera/depth/color/points", 1);

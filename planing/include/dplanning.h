@@ -4,9 +4,6 @@
 
 #include "planning_client.h"
 #include "grid/Grid3D.h"
-#include "ewok/ed_ring_buffer.hpp"
-#include "ewok/raycast_ring_buffer.hpp"
-#include "ewok/ring_buffer_base.hpp"
 
 
 #include "path_planning/APF.h"
@@ -26,6 +23,15 @@
 #include <ros/ros.h>
 #include <ros/subscribe_options.h>
 
+#include <std_msgs/Bool.h>
+#include <std_msgs/Float32.h>
+#include <std_srvs/SetBool.h>
+#include <nav_msgs/Path.h>
+#include <nav_msgs/Odometry.h>
+#include <Eigen/Dense>
+#include <Eigen/Dense>
+#include <eigen_conversions/eigen_msg.h>
+
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -40,9 +46,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_eigen/tf2_eigen.h>
 
-#include <nav_msgs/Path.h>
-#include <std_msgs/Float32.h>
-#include <Eigen/Dense>
+
 
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/PositionTarget.h>
@@ -55,7 +59,7 @@
 #include <sensor_msgs/PointCloud2.h>
 
 
-#include <std_srvs/SetBool.h>
+
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -86,9 +90,7 @@
 
 
 
-#include <Eigen/Dense>
-#include <nav_msgs/Odometry.h>
-#include <eigen_conversions/eigen_msg.h>
+
 
 class PlanningClient;
 class Grid3D;
@@ -141,12 +143,6 @@ public:
 	ros::Rate *rate_;
 	tf2_ros::Buffer tfBuffer_;
 
-	bool initialized = false;
-	const double resolution = 0.3;
-	static const int POW = 4;
-	static const int N = (1 << POW);
-	ewok::EuclideanDistanceRingBuffer<POW, int16_t, float, uint8_t>::Ptr rrb;
-
 
 
 	//d_ ~ mean Drone message.
@@ -179,10 +175,12 @@ public:
   	void bin_octomap_callback(const sensor_msgs::PointCloud2::ConstPtr &msg);
 	void full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg);
 
-	void pointcloud2_callback(const sensor_msgs::PointCloud2::ConstPtr &cloud);
-	void local_odom_callback(const nav_msgs::Odometry::ConstPtr &odom);
 
-	void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud);
+
+	//local map callback
+	void occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg);
+	void apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
+	
 
 	void public_local_position();
 	void run();
