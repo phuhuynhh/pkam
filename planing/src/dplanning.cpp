@@ -315,6 +315,113 @@ void DPlanning::run()
 			}
 			break;
 		}
+		case PLANNING_STEP::ASTAR_PLANNING:
+		{
+			this->grid = new Grid3D(100,100,10,1);
+			octomap::point3d current_pos(d_local_position.pose.position.x,
+						  d_local_position.pose.position.y,
+						  d_local_position.pose.position.z);	
+			grid->Initilize(current_pos);
+			grid->readOctomapMsg(this->octomap_msgs);
+
+			astar = new Astar(
+			octomap::point3d(endpoint_pos_ENU.pose.position.x,
+				endpoint_pos_ENU.pose.position.y,
+				endpoint_pos_ENU.pose.position.z),
+			this->grid);
+
+			std::vector<int> node_index;
+			bool solved = astar->find_path(current_pos, node_index,100000);
+
+			if(solved){
+				mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+				mav_trajectory_generation ::Vertex::Vector vertices;
+				const int dimension = 3;
+				const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+				// we have 2 vertices:
+				// Start = current position
+				// end = desired position and velocity
+				mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+				int marr_index = 0;
+				for(std::vector<int>::iterator it = node_index.begin(); it != node_index.end(); ++it){
+
+					octomap::point3d pos = grid->toPosition(*it);
+
+					visualization_msgs::Marker mk;
+					mk.id = marr_index;
+					mk.type = mk.CUBE;
+					marr_index += 1;
+					mk.header.frame_id = "map";
+					mk.pose.position.x = pos.x();
+					mk.pose.position.y = pos.y();
+					mk.pose.position.z = pos.z();
+					mk.color.r = 1.0;
+					mk.color.a = 1.0;
+					mk.scale.x = 0.2;
+					mk.scale.y = 0.2;
+					mk.scale.z = 0.2;
+					this->d_way_points.markers.push_back(mk);
+
+					if(it == node_index.begin()){
+						start.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+						// set start point's velocity to be constrained to current velocity
+						start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d::Zero());
+						vertices.push_back(start);
+					}
+					else if(std::next(it) == node_index.end()){
+						end.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+						// set start point's velocity to be constrained to current velocity
+						end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(0, 0, 0));
+						vertices.push_back(end);
+					}
+					else{
+						mav_trajectory_generation::Vertex vertex(dimension);
+						vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos.x(), pos.y(), pos.z()));
+						vertices.push_back(vertex);
+					}
+				}
+				// setimate initial segment times
+				std::vector<double> segment_times;
+				segment_times = estimateSegmentTimes(vertices, 3.0, 1.0);
+				// set up optimization problem
+				const int N = 10;
+				mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+				opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+				// constrain velocity and acceleration
+				opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
+				opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
+
+				// solve trajectory
+				opt.optimize();
+				opt.getTrajectory(&trajectory);
+
+				// use it for controller.
+				// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+				// in EigenTrajectoryPoint struct
+				// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+				// Whole trajectory:
+				double sampling_interval = 0.05;
+				bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+
+				double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+				std::string frame_id = "map";
+
+				// From Trajectory class:
+				mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);
+				ros_client->way_points_pub.publish(d_way_points);
+				ros_client->global_traj_pub.publish(global_trajectory);
+				pre_time = ros::Time::now();
+				this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
+				break;				
+			}
+			else{
+				ROS_INFO("FAILED TO FIND PATH WITH ASTAR");
+			}
+			break;
+		}
 		case PLANNING_STEP::FOLLOW_TRAJECTORY:
 		{
 			double dt = ros::Time::now().toSec() - pre_time.toSec();
@@ -357,10 +464,6 @@ void DPlanning::run()
 		}
 		}
 	}
-
-
-
-
 		ros::spinOnce();
 		rate_->sleep();
 	}

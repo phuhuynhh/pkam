@@ -97,7 +97,7 @@ class Astar;
 class EuclideanDistanceRingBuffer;
 class RaycastRingBuffer;
 class RingBufferBase;
-
+	
 using namespace message_filters;
 
 
@@ -118,6 +118,7 @@ public:
 		FOLLOW_TRAJECTORY,
 		LOCAL_PLANNING,
 		IDLE,
+		ASTAR_PLANNING,
 		//MORE
 	};
 
