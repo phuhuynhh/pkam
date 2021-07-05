@@ -19,65 +19,65 @@ void Grid3D::Initilize(const octomap::point3d& origin){
   corner.z() = origin.z()-static_cast<float>(sizeZ-1)*resolution/2.0f;
 }
 
-  void Grid3D::insertScanPoint(
-    const pcl::PointCloud<pcl::PointXYZ>& points_cloud,
-    const tf::Point& sensorOriginTf){
+  // void Grid3D::insertScanPoint(
+  //   const pcl::PointCloud<pcl::PointXYZ>& points_cloud,
+  //   const tf::Point& sensorOriginTf){
 
-    octomap::point3d sensorOrigin(sensorOriginTf.x(), sensorOriginTf.y(), sensorOriginTf.z());
+  //   octomap::point3d sensorOrigin(sensorOriginTf.x(), sensorOriginTf.y(), sensorOriginTf.z());
 
-    std::set<int> all_nodes;
-    std::set<int> occupied_nodes;
+  //   std::set<int> all_nodes;
+  //   std::set<int> occupied_nodes;
 
-    for(pcl::PointCloud<pcl::PointXYZ>::const_iterator it = points_cloud.begin(); it != points_cloud.end(); ++it){
-      octomap::point3d point(it->x, it->y, it->z);
-      castRay(sensorOrigin, point, index_ray);
-      all_nodes.insert(index_ray.begin(), index_ray.end());
-      occupied_nodes.insert(index_ray.back());
-    }
-    std::set<int> free_nodes;
-    std::set_difference(all_nodes.begin(),
-      all_nodes.end(),
-      occupied_nodes.begin(),
-      occupied_nodes.end(),
-      std::inserter(free_nodes, free_nodes.end()));
+  //   for(pcl::PointCloud<pcl::PointXYZ>::const_iterator it = points_cloud.begin(); it != points_cloud.end(); ++it){
+  //     octomap::point3d point(it->x, it->y, it->z);
+  //     castRay(sensorOrigin, point, index_ray);
+  //     all_nodes.insert(index_ray.begin(), index_ray.end());
+  //     occupied_nodes.insert(index_ray.back());
+  //   }
+  //   std::set<int> free_nodes;
+  //   std::set_difference(all_nodes.begin(),
+  //     all_nodes.end(),
+  //     occupied_nodes.begin(),
+  //     occupied_nodes.end(),
+  //     std::inserter(free_nodes, free_nodes.end()));
 
-  }
+  // }
 
-  void Grid3D::insertOctomapCloud(const pcl::PointCloud<pcl::PointXYZ>& points_cloud){
-    all_occupied_nodes.clear();
-    for(pcl::PointCloud<pcl::PointXYZ>::const_iterator it = points_cloud.begin(); it != points_cloud.end(); ++it){
-      if(isValidIndex(toIndex(it->x, it->y, it->z))){
-        all_occupied_nodes.insert(toIndex(it->x, it->y, it->z));
-      }
-    }
+  // void Grid3D::insertOctomapCloud(const pcl::PointCloud<pcl::PointXYZ>& points_cloud){
+  //   all_occupied_nodes.clear();
+  //   for(pcl::PointCloud<pcl::PointXYZ>::const_iterator it = points_cloud.begin(); it != points_cloud.end(); ++it){
+  //     if(isValidIndex(toIndex(it->x, it->y, it->z))){
+  //       all_occupied_nodes.insert(toIndex(it->x, it->y, it->z));
+  //     }
+  //   }
 
-    new_free_nodes.clear();
-    new_occupied_nodes.clear();
+  //   new_free_nodes.clear();
+  //   new_occupied_nodes.clear();
 
-    std::set_difference(temp_occupied_nodes.begin(),
-      temp_occupied_nodes.end(),
-      all_occupied_nodes.begin(),
-      all_occupied_nodes.end(),
-      std::inserter(new_free_nodes,new_free_nodes.end())
-    );
+  //   std::set_difference(temp_occupied_nodes.begin(),
+  //     temp_occupied_nodes.end(),
+  //     all_occupied_nodes.begin(),
+  //     all_occupied_nodes.end(),
+  //     std::inserter(new_free_nodes,new_free_nodes.end())
+  //   );
 
-    std::set_difference(all_occupied_nodes.begin(),
-      all_occupied_nodes.end(),
-      temp_occupied_nodes.begin(),
-      temp_occupied_nodes.end(),
-      std::inserter(new_occupied_nodes,new_occupied_nodes.end())
-    );
-    //
+  //   std::set_difference(all_occupied_nodes.begin(),
+  //     all_occupied_nodes.end(),
+  //     temp_occupied_nodes.begin(),
+  //     temp_occupied_nodes.end(),
+  //     std::inserter(new_occupied_nodes,new_occupied_nodes.end())
+  //   );
+  //   //
 
-    for(std::set<int>::const_iterator it = new_free_nodes.begin(); it != new_free_nodes.end(); ++it){
-      this->occupied_nodes[*it] = 0;
-    }
-    for(std::set<int>::const_iterator it = new_occupied_nodes.begin(); it != new_occupied_nodes.end(); ++it){
-      this->occupied_nodes[*it] = 1;
-    }
+  //   for(std::set<int>::const_iterator it = new_free_nodes.begin(); it != new_free_nodes.end(); ++it){
+  //     this->occupied_nodes[*it] = 0;
+  //   }
+  //   for(std::set<int>::const_iterator it = new_occupied_nodes.begin(); it != new_occupied_nodes.end(); ++it){
+  //     this->occupied_nodes[*it] = 1;
+  //   }
 
-    temp_occupied_nodes = all_occupied_nodes;
-  }
+  //   temp_occupied_nodes = all_occupied_nodes;
+  // }
 
   void Grid3D::castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set){
     key_set.clear();
@@ -341,6 +341,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
   void Grid3D::getFreeNeighborIndex(const int &index, std::vector<int> &neighbor){
     neighbor.clear();
+    std::vector<int> keyset;
     if(isValidIndex(index+1) && !isOccupied(index+1)){
       neighbor.push_back(index+1);
     }
@@ -395,13 +396,20 @@ void Grid3D::Initilize(const octomap::point3d& origin){
       return true;
     }
 
+    octomap::point3d pos = toPosition(index);
+    fcl::Vec3f translation(pos.x(),pos.y(),pos.z());
+    fcl::Quaternion3f rotation((float)1, (float)0, (float)0, (float)0);
 
-    if(occupied_nodes[index] == 1){
-      return true;
-    }
-    else{
-      return false;
-    }
+    fcl::CollisionObject aircraftObject(Quadcopter);
+    fcl::CollisionObject treeObj((tree_obj));
+
+    aircraftObject.setTransform(rotation, translation);
+
+    fcl::CollisionRequest requestType(1,false,1,false);
+		fcl::CollisionResult collisionResult;
+		fcl::collide(&aircraftObject, &treeObj, requestType, collisionResult);
+
+		return(collisionResult.isCollision());
   }
 
   bool Grid3D::isOccupied(const float& x, const float& y, const float& z){
@@ -432,4 +440,10 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
   int Grid3D::uni_random(){
     return this->random_idx(this->generator);
+  }
+
+  void Grid3D::readOctomapMsg(const octomap_msgs::Octomap::ConstPtr& octomap){
+    octomap::OcTree* colorTree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*octomap));
+    fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(colorTree));
+    tree_obj = std::shared_ptr<fcl::CollisionGeometry>(tree);
   }

@@ -1,20 +1,5 @@
 #include "control_client.h"
 
-#include <ros/ros.h>
-#include <mavros_msgs/CommandBool.h>
-#include <mavros_msgs/CommandTOL.h>
-#include <mavros_msgs/SetMode.h>
-#include <mavros_msgs/State.h>
-#include <mavros_msgs/ExtendedState.h>
-#include <mavros_msgs/GlobalPositionTarget.h>
-#include <geometry_msgs/PoseArray.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <geometry_msgs/TransformStamped.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <std_msgs/String.h>
-
-
 ControlClient::ControlClient(int &argc, char **argv)
 {
 	this->nh_ = new ros::NodeHandle();
@@ -32,9 +17,16 @@ void ControlClient::init(DController *const drone_control)
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DController::local_position_callback, drone_control);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DController::global_position_callback, drone_control);
 
-  	//For Path Planing.
+  	//For position control from Planning package.
 	getpoint_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10, &DController::getpoint_position_callback, drone_control);
 	setpoint_pos_local_pub = nh_->advertise<geometry_msgs::PoseStamped>("/mavros/setpoint_position/local", 10);
+	
+
+	//For PositionTarget Raw control form planning (flowing trajectory)
+	getpoint_raw_sub = nh_->subscribe<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10, &DController::getpoint_raw_callback, drone_control);
+	setpoint_raw_pub = nh_->advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 10);
+	
+
 
 
 
@@ -47,6 +39,7 @@ void ControlClient::init(DController *const drone_control)
 	* quaternion (TODO).
 	* with this propose we can change velocity and acceleration run time and add pid controller.
 	*/
+	//Goal target for planning.
 	endpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10);
 
 

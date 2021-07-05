@@ -6,11 +6,12 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
 
 find_package(ompl REQUIRED)
 find_package(fcl REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED)
 
 set(PACKAGE_DEPENDENCIES
   mavros
   mavros_msgs
-  octomap_msgs
   tf
   pcl_conversions
   pcl_msgs
@@ -22,6 +23,7 @@ set(PACKAGE_DEPENDENCIES
   geometry_msgs
   nav_msgs
   octomap_ros
+  octomap_msgs
   visualization_msgs
   mav_trajectory_generation
   mav_trajectory_generation_ros
@@ -30,6 +32,10 @@ set(PACKAGE_DEPENDENCIES
 find_package(catkin REQUIRED COMPONENTS
   ${PACKAGE_DEPENDENCIES}
 )
+
+add_definitions(${PCL_DEFINITIONS})
+
+
 
 catkin_package(
  INCLUDE_DIRS include
@@ -44,12 +50,20 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
+
+
+
+
+
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OMPL_INCLUDE_DIRS}
   ${fcl_INCLUDE_DIRS}
-)
+  )
+include_directories(${PCL_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR}) 
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set( EXECUTABLE_SRC
 src/planning_node.cpp
@@ -65,7 +79,7 @@ src/path_planning/Astar.cpp
 src/grid/updatable_priority_queue.cpp
 )
 
-link_libraries(${OCTOMAP_LIBRARIES} ${OMPL_LIBRARY_DIRS} ${fcl_LIBRARY_DIRS})
+link_libraries(${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES} ${OMPL_LIBRARY_DIRS} ${fcl_LIBRARY_DIRS})
 
 add_executable(dplanning ${EXECUTABLE_SRC})
-target_link_libraries(dplanning ${catkin_LIBRARIES} ${OMPL_LIBRARIES} fcl)
+target_link_libraries(dplanning ${catkin_LIBRARIES} ${OMPL_LIBRARIES} ${PCL_LIBRARIES} fcl)

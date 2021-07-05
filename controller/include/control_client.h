@@ -4,7 +4,22 @@
 #include "dcontroller.h"
 
 #include <ros/ros.h>
+
+#include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandTOL.h>
+#include <mavros_msgs/SetMode.h>
+#include <mavros_msgs/State.h>
+#include <mavros_msgs/ExtendedState.h>
+#include <mavros_msgs/GlobalPositionTarget.h>
+#include <mavros_msgs/PositionTarget.h>
+
+#include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <geometry_msgs/TransformStamped.h>
+
+#include <sensor_msgs/NavSatFix.h>
+#include <std_msgs/String.h>
 
 class DController; // Forward declaration because of circular reference
 
@@ -19,10 +34,16 @@ class ControlClient
     ros::Subscriber local_pos_sub;
     ros::Subscriber global_pos_sub;
 
-    // for path planning.
+    // Position Control from Planning.
     ros::Subscriber getpoint_pos_sub;
     ros::Publisher setpoint_pos_local_pub;
-    // get end point for command.
+
+    //Raw control from Planning
+    ros::Subscriber getpoint_raw_sub;
+    ros::Publisher setpoint_raw_pub;
+
+
+    // endpoint Goal target for planning.
     ros::Publisher endpoint_pos_pub;
 
 

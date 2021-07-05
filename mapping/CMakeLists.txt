@@ -5,6 +5,8 @@ add_compile_options(-std=c++11)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(PACKAGE_DEPENDENCIES
+  roscpp
+  rospy
   mavros
   mavros_msgs
   octomap_msgs
@@ -12,8 +14,6 @@ set(PACKAGE_DEPENDENCIES
   pcl_conversions
   pcl_msgs
   pcl_ros
-  roscpp
-  rospy
   sensor_msgs
   std_msgs
   geometry_msgs
@@ -27,9 +27,11 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 
-find_package(catkin_simple REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(octomap REQUIRED)
+
+
+add_definitions(${PCL_DEFINITIONS})
 
 catkin_package(
  INCLUDE_DIRS include
@@ -38,17 +40,23 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+
+
 include_directories(
   include
+  ${PCL_DEFINITIONS}
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR} 
   ${OCTOMAP_INCLUDE_DIRS}}
 )
+include_directories(${PCL_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 
 # catkin_simple()
 
-add_executable(mapping_example src/mapping_node.cpp)
+add_executable(mapping src/mapping_node.cpp)
 
 
-target_link_libraries(mapping_example ${catkin_LIBRARIES})
+target_link_libraries(mapping  ${PCL_LIBRARIES} ${catkin_LIBRARIES})

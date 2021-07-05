@@ -45,11 +45,10 @@ int main(int argc, char **argv)
 				if (drone_control.is_mission_finished()){
 					ROS_INFO("TakeOff Finished.");
 					drone_control.mission_state  = DController::MISSION_STATE::COMMAND;
-
 				}
 				break;
 			case (DController::MISSION_STATE::COMMAND):
-					drone_control.flyToLocal(20,0,2.5); // (5,5,3) was a test case for A*
+					drone_control.flyToLocal(39,0,2.25); // (5,5,3) was a test case for A*
 				if (drone_control.is_mission_finished()){
 					drone_control.mission_state  = DController::MISSION_STATE::LAND;
 				}
@@ -61,8 +60,18 @@ int main(int argc, char **argv)
 				break;
 		}
 
+		switch (drone_control.control_type)
+		{
+		case DController::CONTROL_TYPE::POSITION:
+			drone_control.public_local_position();
+			break;
+		
+		default:
+			drone_control.public_raw_target();
+			break;
+		}
+
 		//Public setpoint_pos_ENU to MAVROS.
-		drone_control.public_local_position();
 		ros::spinOnce();
 		rate->sleep();
 	}

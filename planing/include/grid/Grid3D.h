@@ -28,6 +28,20 @@
 #include <tf/message_filter.h>
 #include <message_filters/subscriber.h>
 
+#include <octomap/octomap.h>
+#include <octomap_msgs/Octomap.h>
+#include <octomap/ColorOcTree.h>
+#include <octomap/OcTreeKey.h>
+#include <octomap_msgs/conversions.h>
+
+#include "fcl/config.h"
+#include "fcl/octree.h"
+#include "fcl/traversal/traversal_node_octree.h"
+#include "fcl/collision.h"
+#include "fcl/broadphase/broadphase.h"
+#include "fcl/math/transform.h"
+
+
   class Node;
   class Edge;
 
@@ -46,16 +60,14 @@
     // std::vector<Node> node_list;
     // std::vector<std::unordered_map<int, Edge>> adjency_list;
 
-    //fast access to the ocupancy node
-    std::vector<int> occupied_nodes;
 
-    std::set<int> new_free_nodes;
-    std::set<int> new_occupied_nodes;
-    std::set<int> all_occupied_nodes;
-    std::set<int> temp_occupied_nodes;
 
     std::default_random_engine generator;
     std::uniform_int_distribution<int> random_idx;
+
+    std::shared_ptr<fcl::CollisionGeometry> tree_obj;
+    std::shared_ptr<fcl::CollisionGeometry> Quadcopter;
+
     Grid3D(
       int x,
       int y,
@@ -68,22 +80,17 @@
       this->sizeY = y;
       this->sizeZ = z;
 
-      occupied_nodes.resize(x*y*z, 0);
       random_idx = std::uniform_int_distribution<int>(0, x*y*z-1);
+      Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.5, 0.5, 0.5));
     }
 
     void Initilize(const octomap::point3d& origin);
 
-    //TODO: change node accuracy accordingly to the point cloud
-    void insertScanPoint(const pcl::PointCloud<pcl::PointXYZ>& points_cloud, const tf::Point& sensorOriginTf);
-
-    //TODO: insert octomap cloud
-    void insertOctomapCloud(const pcl::PointCloud<pcl::PointXYZ>& points_cloud);
+    void readOctomapMsg(const octomap_msgs::Octomap::ConstPtr& octomap);
 
     //Approprialy adjust edges cost when a node ocupanccy changeconst tf::Point
     // void HandleOccupancyChange(const int &node_index,const bool &change);
 
-    //return indexs of voxel touch by the ray
     void castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set);
 
     int toIndex(const float &x, const float &y, const float &z);

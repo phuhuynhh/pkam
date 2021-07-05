@@ -21,12 +21,22 @@
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/ExtendedState.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/PositionTarget.h>
+#include <mavros_msgs/CommandTOL.h>
+#include <mavros_msgs/SetMode.h>
+#include <mavros_msgs/GlobalPositionTarget.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
+
 #include <sensor_msgs/NavSatFix.h>
+#include <tf/tf.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <std_srvs/SetBool.h>
 
@@ -45,13 +55,19 @@ public:
 	};
 	static MISSION_STATE mission_state;
 
+	enum class CONTROL_TYPE{
+		POSITION = 0,
+		RAW = 1,
+	};
+	CONTROL_TYPE control_type = CONTROL_TYPE::POSITION;
+
 	static  int global_num;
 
 	DController(ControlClient *ros_client);
 	DController(ControlClient *ros_client,ros::Rate *rate);
 
 	static constexpr bool  KEEP_ALIVE = true;
-	static constexpr float TAKEOFF_ALTITUDE = 1.5;
+	static constexpr float TAKEOFF_ALTITUDE = 1.75;
 	static constexpr int   MAX_ATTEMPTS = 300;
 	static constexpr float SAFETY_ALTITUDE_GPS = 3.0;
 	static constexpr float ROS_RATE = 20.0;
@@ -77,11 +93,17 @@ public:
 
 
 	//Subsriber Callback.
+	//mavros data from mavlink
 	void state_callback(const mavros_msgs::State::ConstPtr &msg);
 	void extended_state_callback(const mavros_msgs::ExtendedState::ConstPtr &msg);
 	void local_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
 	void global_position_callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
+
+	//position from planning.
 	void getpoint_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
+	//raw target from planning
+	void getpoint_raw_callback(const mavros_msgs::PositionTarget::ConstPtr &msg);
+
 
 	//Timer Callback, test fail => TODO.
 	void offboardStatusLooper(const ros::TimerEvent &event);
@@ -102,6 +124,7 @@ public:
 
 
 	void public_local_position();
+	void public_raw_target();
 
 private:
 	ControlClient *ros_client;
@@ -113,8 +136,12 @@ private:
 	uint8_t d_landed_state = 0;
 	uint8_t close_enough = 0;
 
+	// This parameter for position control.
 	// Use this param for ros_client->setpoint_pos_local_pub()
 	geometry_msgs::PoseStamped setpoint_pos_ENU;
+
+	// This parameter for raw control.
+	mavros_msgs::PositionTarget setpoint_raw_target;
 
 	// Use this param for Trajectory Generetor via : ros_client->endpoint_pos_pub()
 	// pass to path-planning node.
