@@ -32,17 +32,16 @@
 #include <algorithm>
 
 
-
 namespace ewok {
 
 template<int _POW, typename _Datatype, typename _Scalar = float>
 class RingBufferBase {
  public:
 
-  const int _N = (1 << _POW); // 2 to the power of POW
-  const int _N_2 = _N / 2;
-  const int _MASK = (_N - 1);
-  const int _NEG_MASK = ~_MASK;
+  static const int _N = (1 << _POW); // 2 to the power of POW
+  static const int _N_2 = _N / 2;
+  static const int _MASK = (_N - 1);
+  static const int _NEG_MASK = ~_MASK;
 
   typedef Eigen::Matrix<_Scalar, 3, 1> Vector3;
   typedef Eigen::Matrix<_Scalar, 4, 1> Vector4;

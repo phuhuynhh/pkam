@@ -1,8 +1,5 @@
 #include "dplanning.h"
 
-
-
-
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
@@ -74,7 +71,7 @@ void DPlanning::run()
 				{
 					if (distance(d_local_position, endpoint_pos_ENU) < 0.2)
 					{
-						double travel_time = ros::Time::now().toSec() - start_time.toSec();
+						double travel_time = ros::Time::now().toSec() - start_time;
 						ROS_INFO("Distance : %f", distance(d_local_position, endpoint_pos_ENU));
 						ROS_INFO("Time : %f", travel_time);
 						ROS_INFO("Travel distance : %f", travel_cost);
@@ -138,11 +135,197 @@ void DPlanning::run()
 					// // publishVisualize();
 					// ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
+					// create a start state
+					ob::ScopedState<ob::SE3StateSpace> start(space);
+					// create a goal state
+					ob::ScopedState<ob::SE3StateSpace> goal(space);
+					// set the bounds for the R^3 part of SE(3)
+					ob::RealVectorBounds bounds(3);
+
+					//TODO : Assign Khang VO.
+					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
+					bounds.setLow(0, _min_bounds[0]);
+					bounds.setHigh(0, _max_bounds[0]);
+					bounds.setLow(1,  _min_bounds[1]);
+					bounds.setHigh(1,  _max_bounds[1]);
+					bounds.setLow(2, 0);
+					bounds.setHigh(2, 3);
+
+					space->as<ob::SE3StateSpace>()->setBounds(bounds);
+
+					// construct an instance of  space information from this state space
+					si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
+
+					// we get 15 second ahead of time in the global trajectory as the local destination
+					double dt = ros::Time::now().toSec() - global_start_time;
+					double d_future = dt + 10.0;
+
+					//The current position from time
+					Eigen::VectorXd position_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd vel_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd acce_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+
+					//Target position from time
+					Eigen::VectorXd target_position_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd target_vel_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd target_acce_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::ACCELERATION);
+
+					// construct an instance of  space information from this state space
+					si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
+					start->setXYZ(position_d(0),
+						position_d(1),
+						position_d(2));
+					start->as<ob::SO3StateSpace::StateType>(1)->setIdentity(); // start.random();
+					goal->setXYZ(target_position_d(0),
+						target_position_d(1),
+						target_position_d(2));
+					goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+					// goal.random();
+
+					// set state validity checking for this space
+					std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
+					si->setStateValidityChecker(validity_checker);
+
+					// create a problem instance
+					pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
+					// set the start and goal states
+					pdef->setStartAndGoalStates(start, goal);
+					// set Optimizattion objective
+					ob::OptimizationObjectivePtr obj(new ob::PathLengthOptimizationObjective(si));
+					obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
+					pdef->setOptimizationObjective(obj);
+
+					ob::PlannerPtr plan(new og::RRTstar(si));
+					// set the problem we are trying to solve for the planner
+					plan->setProblemDefinition(pdef);
+					// perform setup steps for the planner
+					plan->setup();
+					// attempt to solve the problem within 0.01 second of planning time
+					ob::PlannerStatus solved = plan->solve(2);
+
+					if (solved)
+					{
+						int marr_index = 0;
+
+						// Path smoothing using bspline
+						// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+						// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+						// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+
+						// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+						// // Using 5, as is the default value of the function
+						// // If the path is not smooth, the value of smoothness() will be closer to 1
+						// int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+						// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+						// ROS_INFO("Smoothed Path\n");
+						// _path_smooth->print(std::cout);
+
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						og::PathGeometric *path = pdef->getSolutionPath()->as<og::PathGeometric>();
+						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
+						{
+							const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+
+							// extract the first component of the state and cast it to what we expect
+							const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+							// extract the second component of the state and cast it to what we expect
+							const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+							// visualization_msgs::Marker mk;
+							// mk.id = marr_index;
+							// mk.type = mk.CUBE;
+							// marr_index += 1;
+							// mk.header.frame_id = "map";
+							// mk.pose.position.x = pos->values[0];
+							// mk.pose.position.y = pos->values[1];
+							// mk.pose.position.z = pos->values[2];
+							// mk.color.r = 1.0;
+							// mk.color.a = 1.0;
+							// mk.scale.x = 0.2;
+							// mk.scale.y = 0.2;
+							// mk.scale.z = 0.2;
+							// this->d_way_points.markers.push_back(mk);
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(vel_d(0), vel_d(1), vel_d(2)));
+								start.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(acce_d(0), acce_d(1), acce_d(2)));
+								vertices.push_back(start);
+							}
+							else if (path_idx == path->getStateCount() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(target_vel_d(0), target_vel_d(1), target_vel_d(2)));
+								end.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(target_acce_d(0), target_acce_d(1), target_acce_d(2)));
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 3.0, 1.0);
+						// set up optimization problem
+						const int N = 10;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
+
+						// solve trajectory
+						opt.optimize();
+						opt.getTrajectory(&local_trajectory);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						// Whole trajectory:
+						// double sampling_interval = 0.05;
+						// bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
+
+						// double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// // From Trajectory class:
+						// mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
+						// ros_client->way_points_pub.publish(d_way_points);
+						// ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						local_start_time = ros::Time::now().toSec();
+						pre_time = 0;
+						this->planning_type = PLANNING_STEP::FOLLOW_LOCAL_TRAJECTORY;
+						break;
+					}
+					else
+					{
+						ROS_INFO("FAILED TO FIND LOCAL PATH WITH OMPL-RRT");
+					}
 					break;
 				}
 				case PLANNING_STEP::GLOBAL_PLANNING:
 				{
-					global_trajectory.markers.clear();
+					global_trajectory_markerarray.markers.clear();
 					d_way_points.markers.clear();
 					space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
@@ -286,7 +469,7 @@ void DPlanning::run()
 
 						// solve trajectory
 						opt.optimize();
-						opt.getTrajectory(&trajectory);
+						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
 						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
@@ -295,17 +478,17 @@ void DPlanning::run()
 
 						// Whole trajectory:
 						double sampling_interval = 0.05;
-						bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+						bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
 
 						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
 						ros_client->way_points_pub.publish(d_way_points);
-						ros_client->global_traj_pub.publish(global_trajectory);
-						pre_time = ros::Time::now();
-						this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
+						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						global_start_time = ros::Time::now().toSec();
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
 						break;
 					}
 					else
@@ -394,7 +577,7 @@ void DPlanning::run()
 
 						// solve trajectory
 						opt.optimize();
-						opt.getTrajectory(&trajectory);
+						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
 						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
@@ -403,17 +586,17 @@ void DPlanning::run()
 
 						// Whole trajectory:
 						double sampling_interval = 0.05;
-						bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+						bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
 
 						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
 						ros_client->way_points_pub.publish(d_way_points);
-						ros_client->global_traj_pub.publish(global_trajectory);
-						pre_time = ros::Time::now();
-						this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
+						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						global_start_time = ros::Time::now().toSec();
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
 						break;				
 					}
 					else{
@@ -421,11 +604,11 @@ void DPlanning::run()
 					}
 					break;
 				}
-				case PLANNING_STEP::FOLLOW_TRAJECTORY:
+				case PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY:
 				{
-					double dt = ros::Time::now().toSec() - pre_time.toSec();
-					int derivative_order = mav_trajectory_generation::derivative_order::POSITION;
-					if (dt > trajectory.getMaxTime())
+					double dt = ros::Time::now().toSec() - global_start_time;
+					double d_future = dt;
+					if (dt > global_trajectory.getMaxTime())
 					{
 						endpoint_active = false;
 						ROS_INFO("Finished.");
@@ -433,9 +616,9 @@ void DPlanning::run()
 						break;
 					}
 
-					Eigen::VectorXd position_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
-					Eigen::VectorXd vel_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
-					Eigen::VectorXd acce_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+					Eigen::VectorXd position_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd vel_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd acce_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
 
 					//PositionTarget Message Format.
 
@@ -452,6 +635,75 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
 
+					trajectory_subset.poses.clear();
+					for(int i = 0; i < 30; i++){
+						d_future += 0.1;
+						Eigen::VectorXd position_future = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+
+						geometry_msgs::Pose future_pose;
+						future_pose.position.x = position_future(0);
+						future_pose.position.y = position_future(1);
+						future_pose.position.z = position_future(2);
+
+						trajectory_subset.poses.push_back(future_pose);
+					}
+
+					ros_client->traj_subset_pub.publish(trajectory_subset);
+
+					// publishVisualize();
+					ros_client->publish_raw_position_target(setpoint_raw);
+					break;
+				}
+				case PLANNING_STEP::FOLLOW_LOCAL_TRAJECTORY:
+				{
+					double dt = ros::Time::now().toSec() - local_start_time;
+					double d_future = dt;
+					double delta_t = dt - pre_time;
+					// global_start_time += delta_t;
+					pre_time = dt;
+					if (dt > local_trajectory.getMaxTime())
+					{
+						global_start_time = global_start_time - 10.0 + dt;
+						endpoint_active = false;
+						ROS_INFO("Finished.");
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
+						break;
+					}
+
+					Eigen::VectorXd position_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd vel_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd acce_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+
+					//PositionTarget Message Format.
+
+					setpoint_raw.header.stamp = ros::Time::now();
+					setpoint_raw.header.frame_id = "map";
+					setpoint_raw.type_mask = 0;
+					setpoint_raw.position.x = position_d(0);
+					setpoint_raw.position.y = position_d(1);
+					setpoint_raw.position.z = position_d(2);
+					setpoint_raw.velocity.x = vel_d(0);
+					setpoint_raw.velocity.y = vel_d(1);
+					setpoint_raw.velocity.z = vel_d(2);
+					setpoint_raw.acceleration_or_force.x = acce_d(0);
+					setpoint_raw.acceleration_or_force.y = acce_d(1);
+					setpoint_raw.acceleration_or_force.z = acce_d(2);
+
+					trajectory_subset.poses.clear();
+					for(int i = 0; i < 30; i++){
+						d_future += 0.1;
+						Eigen::VectorXd position_future = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+
+						geometry_msgs::Pose future_pose;
+						future_pose.position.x = position_future(0);
+						future_pose.position.y = position_future(1);
+						future_pose.position.z = position_future(2);
+
+						trajectory_subset.poses.push_back(future_pose);
+					}
+
+					ros_client->traj_subset_pub.publish(trajectory_subset);
+
 					// publishVisualize();
 					ros_client->publish_raw_position_target(setpoint_raw);
 					break;
@@ -459,6 +711,10 @@ void DPlanning::run()
 				case PLANNING_STEP::IDLE:
 				{
 					ROS_INFO("Target reach. Waiting for command");
+					break;
+				}
+				case PLANNING_STEP::APF:
+				{
 					break;
 				}
 			}
@@ -516,8 +772,8 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
 
-		start_time = ros::Time::now();
-		pre_time = ros::Time::now();
+		start_time = ros::Time::now().toSec();
+		pre_time = ros::Time::now().toSec();
 		startpoint_pos_ENU = d_local_position;
 		d_previous_position = d_local_position;
 		travel_cost = 0.0;
@@ -562,28 +818,14 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 //local map callback
 //TODO : Khang VO
 void DPlanning::occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg){
+	if(msg->data){
+		planning_type = PLANNING_STEP::LOCAL_PLANNING;
 
+	}
 }
 void DPlanning::apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg){
-
+	apf_vel = *msg;
 }
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

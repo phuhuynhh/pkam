@@ -53,8 +53,10 @@
 #include <mavros_msgs/GlobalPositionTarget.h>
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
 
@@ -117,10 +119,12 @@ public:
 	enum class PLANNING_STEP {
 		TAKE_OFF,
 		GLOBAL_PLANNING,
-		FOLLOW_TRAJECTORY,
+		FOLLOW_GLOBAl_TRAJECTORY,
 		LOCAL_PLANNING,
+		FOLLOW_LOCAL_TRAJECTORY,
 		IDLE,
 		ASTAR_PLANNING,
+		APF,
 		//MORE
 	};
 
@@ -156,7 +160,7 @@ public:
 	octomap_msgs::Octomap::ConstPtr octomap_msgs;
 
 
-	visualization_msgs::MarkerArray global_trajectory;
+	visualization_msgs::MarkerArray global_trajectory_markerarray;
 	visualization_msgs::MarkerArray d_way_points;
 
 	// Saving init pose to home.
@@ -210,6 +214,8 @@ private:
 	geometry_msgs::PoseStamped endpoint_pos_ENU; 
 	sensor_msgs::PointCloud2 octomap_cloud;
 
+	// Array of future position of trajectory for replanning checking
+	geometry_msgs::PoseArray trajectory_subset;
 
 	// Space bounds
   	double _min_bounds[3];
@@ -218,8 +224,13 @@ private:
   	double _prev_goal[7];
 
 	// Target_position
-	ros::Time start_time;
-	ros::Time pre_time;
+	double start_time;
+	double pre_time;
+
+	// The starting time when follow global trajectory
+	double global_start_time;
+	//The starting time when follow local trajectory
+	double local_start_time;
 
 	long long worst_duration = 0;
 	long long best_duration = 100000000000000;
@@ -227,8 +238,15 @@ private:
 	ompl::base::StateSpacePtr space;
 	ompl::base::SpaceInformationPtr si;
 	ompl::base::ProblemDefinitionPtr pdef;
-	mav_trajectory_generation::Trajectory trajectory;
+
+	//global trajectory
+	mav_trajectory_generation::Trajectory global_trajectory;
+	//local trajectory
+	mav_trajectory_generation::Trajectory local_trajectory;
+
 	mav_msgs::EigenTrajectoryPoint::Vector states;
+
+	geometry_msgs::PoseStamped apf_vel;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

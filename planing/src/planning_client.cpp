@@ -24,7 +24,7 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	// pointcloud_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points",10,&DPlanning::pointcloud2_callback, drone_planning);
 
 	occ_trigger_sub = nh_->subscribe<std_msgs::Bool>("/mapping/has_occupied",10,&DPlanning::occ_trigger_callback, drone_planning);
-	apf_force_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mapping/potential_force",10,&DPlanning::apf_force_callback, drone_planning);
+	apf_force_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mapping/distance_Sgrad",10,&DPlanning::apf_force_callback, drone_planning);
 
 	//For Planning process
 	/**
@@ -41,6 +41,8 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	setpoint_pos_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/setpoint_position", 10);
 	//TODO : Need subcrible vel,acc for adding constraint.
 	raw_reference_pub = nh_->advertise<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10);
+
+	traj_subset_pub = nh_->advertise<geometry_msgs::PoseArray>("/planning/traj_subset",10);
 
 
 	// message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh, "/mavros/local_position/odom", 1);

@@ -25,12 +25,12 @@
 #ifndef EWOK_RING_BUFFER_INCLUDE_EWOK_RAYCAST_RING_BUFFER_H_
 #define EWOK_RING_BUFFER_INCLUDE_EWOK_RAYCAST_RING_BUFFER_H_
 
-#include <ewok/ring_buffer_base.hpp>
+#include <ewok/ring_buffer_base.h>
 
 #include <vector>
 
-
 namespace ewok {
+
 template<int _POW, typename _Datatype = int16_t, typename _Scalar = float, typename _Flag = uint8_t>
 class RaycastRingBuffer {
  public:
@@ -38,12 +38,12 @@ class RaycastRingBuffer {
   static const int _N = (1 << _POW);  // 2 to the power of POW
 
   // Definitions of flags
-  const uint8_t occupied_flag = (1 << 0);
-  const uint8_t free_flag = (1 << 1);
-  const uint8_t free_ray_flag = (1 << 2);
-  const uint8_t updated_flag = (1 << 3);
+  static const _Flag occupied_flag = (1 << 0);
+  static const _Flag free_flag = (1 << 1);
+  static const _Flag free_ray_flag = (1 << 2);
+  static const _Flag updated_flag = (1 << 3);
 
-  const uint8_t insertion_flags = (occupied_flag | free_flag | free_ray_flag);
+  static const _Flag insertion_flags = (occupied_flag | free_flag | free_ray_flag);
 
 
   // Definition of hit/miss and values for the datatype
@@ -74,7 +74,7 @@ class RaycastRingBuffer {
       occupancy_buffer_(resolution, _Datatype(0)),
       flag_buffer_(resolution, _Flag(0)) {
 
-    flag_buffer_.setEmptyElement(this->updated_flag);
+    flag_buffer_.setEmptyElement(updated_flag);
     clearUpdatedMinMax();
 
   }
@@ -262,7 +262,7 @@ class RaycastRingBuffer {
 
   void getMarkerUpdated(visualization_msgs::Marker & m)  {
     flag_buffer_.getMarkerHelper(m, "ring_buffer_occupied", 0, Vector4(1, 1, 0, 0.8),
-                                      [](const uint8_t & f) { return (f /*& updated_flag */);});
+                                      [](const _Flag & f) { return (f & updated_flag);});
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

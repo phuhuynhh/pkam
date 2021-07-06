@@ -71,7 +71,8 @@ class PlanningClient
     ros::Publisher free_marker_pub;
     ros::Publisher dist_marker_pub;
 
-
+    //Publisher send tracjetory pose to ring buffer
+    ros::Publisher traj_subset_pub;
 
     DPlanning *drone_planning;
     void init(DPlanning *const drone_planning);
