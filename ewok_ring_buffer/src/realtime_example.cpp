@@ -1,5 +1,6 @@
 #include <ewok/ed_ring_buffer.h>
 #include <ewok/APF.h>
+#include <ewok/Astar.h>
 #include <ros/ros.h>
 #include <math.h>       /* isnan, sqrt */
 
@@ -18,9 +19,6 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/time_synchronizer.h>
 
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/PoseArray.h>
-
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/PointCloud2.h>
 
@@ -34,6 +32,10 @@
 
 #include <std_msgs/Bool.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Pose.h>
+
+
 
 
 using namespace message_filters;
@@ -42,8 +44,8 @@ using namespace message_filters;
 ros::Time _last_time;
 
 bool initialized = false;
-const double resolution = 0.2;
-static const int POW = 6;
+const double resolution = 0.5;
+static const int POW = 5;
 static const int N = (1 << POW);
 ewok::EuclideanDistanceRingBuffer<POW> rrb(resolution, 5.0);
 
@@ -53,15 +55,18 @@ ros::Publisher cloud2_pub, center_pub;
 double map_rate, pub_rate;
 std::string m_worldFrameId = "/map";
 
-ros::Publisher occ_trigger_pub, apf_grad_pub; // can has more.
+ros::Publisher occ_trigger_pub, apf_grad_pub, local_waypoint_pub, global_trigger_pub; // can has more.
 Eigen::Vector3f global_origin;
-Eigen::Vector3f global_target;
+Eigen::Vector3f local_target;
 
 geometry_msgs::PoseArray trajectory_subset;
 
 bool apf_active = false;
+bool local_astar_active = false;
+bool local_rrt_active = false;
 
 ewok::APF AP_field;
+ewok::Grid3D Grid(100,100,20,1.0);
 
 void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud)
 {
@@ -159,43 +164,122 @@ void trajectoryCallback(const geometry_msgs::PoseArrayConstPtr& pose_array){
 }
 
 void endpointCallback(const geometry_msgs::PoseStampedConstPtr& endpoint){
-    global_target(0) = endpoint->pose.position.x;
-    global_target(1) = endpoint->pose.position.y;
-    global_target(2) = endpoint->pose.position.z;
+    local_target(0) = endpoint->pose.position.x;
+    local_target(1) = endpoint->pose.position.y;
+    local_target(2) = endpoint->pose.position.z;
+}
+
+void activeAstarCallback(const std_msgs::BoolConstPtr& msg){
+    if(msg->data){
+        local_astar_active = true;
+    }
+    else{
+        local_astar_active = false;
+    }
+}
+
+void activeAPFCallback(const std_msgs::BoolConstPtr& msg){
+    if(msg->data){
+        apf_active = true;
+    }
+    else{
+        apf_active = false;
+    }
+}
+
+void activeRRTCallback(const std_msgs::BoolConstPtr& msg){
+    if(msg->data){
+        local_rrt_active = true;
+    }
+    else{
+        local_rrt_active = false;
+    }
 }
 
 void timerCallback(const ros::TimerEvent& e)
 {
     if(!initialized) return;
-    Eigen::Vector3f grad;
-    if(!apf_active){
-        for(std::vector<geometry_msgs::Pose>::iterator it = trajectory_subset.poses.begin(); it !=  trajectory_subset.poses.end(); ++it){
-            Eigen::Vector3f check_point(it->position.x, it->position.y, it->position.z);
-            float distance = rrb.getDistanceWithGrad(check_point, grad);
-            if(distance < 0.5){
-                std_msgs::Bool change_apf;
-                change_apf.data = true;
-                occ_trigger_pub.publish(change_apf);
-                apf_active = true;
-                ROS_INFO("FUTURE COLLISION");
-                return;
-            }
-        }
-    }
-    else{
+
+
+    if(apf_active){
+        Eigen::Vector3f grad;
         float distance = rrb.getDistanceWithGrad(global_origin, grad);
         Eigen::Vector3f vel;
 
-        AP_field.calculate(global_origin, global_target, distance, grad, vel);
+        AP_field.calculate(global_origin, local_target, distance, grad, vel);
         geometry_msgs::PoseStamped vel_;
         vel_.pose.position.x = vel(0);
         vel_.pose.position.y = vel(1);
         vel_.pose.position.z = vel(2);    
 
         apf_grad_pub.publish(vel_);
-
-
+        return;
     }
+
+    if(local_astar_active){
+        Grid.Initilize(global_origin, &rrb);
+        ewok::Astar astar(local_target, &Grid);
+        std::vector<Eigen::Vector3f> node_index;
+        ROS_INFO("LOCAL_ASTAR_ACTIVE");
+        bool solved = astar.find_path(global_origin, node_index, 500);
+        ROS_INFO("LOCAL_ASTAR_ACTIVE1");
+        if(solved){
+            geometry_msgs::PoseArray local_waypoints;
+            for(std::vector<Eigen::Vector3f>::iterator it = node_index.begin(); it != node_index.end(); ++it){
+                geometry_msgs::Pose pose;
+                pose.position.x = (*it)(0);
+                pose.position.y = (*it)(1);
+                pose.position.z = (*it)(2);
+
+                local_waypoints.poses.push_back(pose);
+            }
+            ROS_INFO("LOCAL PATH SIZE: %d", local_waypoints.poses.size());
+            local_waypoint_pub.publish(local_waypoints);
+        }
+        else{
+            ROS_INFO("ASTAR FAIL TO FIND PATH IN LOCAL MAP");
+            std_msgs::Bool global_trigger;
+            global_trigger.data = true;
+            global_trigger_pub.publish(global_trigger);
+        }
+        trajectory_subset.poses.clear();        
+        local_astar_active = false;        
+        return;
+    }
+
+    for(std::vector<geometry_msgs::Pose>::iterator it = trajectory_subset.poses.begin(); it !=  trajectory_subset.poses.end(); ++it){
+        Eigen::Vector3f grad;
+        Eigen::Vector3f check_point(it->position.x, it->position.y, it->position.z);
+        float distance = rrb.getDistanceWithGrad(check_point, grad);
+        if(distance < 0.5){
+            std_msgs::Bool local_collision;
+            local_collision.data = true;                
+            occ_trigger_pub.publish(local_collision);
+            ROS_INFO("FUTURE COLLISION");
+            break;
+        }
+    }
+
+    trajectory_subset.poses.clear();
+
+    // if(!apf_active){
+
+
+    // }
+    // else{
+    //     float distance = rrb.getDistanceWithGrad(global_origin, grad);
+    //     Eigen::Vector3f vel;
+
+    //     AP_field.calculate(global_origin, global_target, distance, grad, vel);
+    //     geometry_msgs::PoseStamped vel_;
+    //     vel_.pose.position.x = vel(0);
+    //     vel_.pose.position.y = vel(1);
+    //     vel_.pose.position.z = vel(2);    
+
+    //     apf_grad_pub.publish(vel_);
+
+
+    // }
 
 
 
@@ -231,6 +315,8 @@ int main(int argc, char** argv)
     //Local Mapping Controller 
     occ_trigger_pub = nh.advertise<std_msgs::Bool>("/mapping/has_occupied", 1, true);
     apf_grad_pub = nh.advertise<geometry_msgs::PoseStamped>("/mapping/distance_grad", 1, true);
+    local_waypoint_pub = nh.advertise<geometry_msgs::PoseArray>("/mapping/local_waypoints",1,true);
+    global_trigger_pub = nh.advertise<std_msgs::Bool>("/mapping/global_trigger",1,true);
 
     // ringbuffer visualizer
     occ_marker_pub = nh.advertise<visualization_msgs::Marker>("/local_map_visualizer/occupied", 5, true);
@@ -243,7 +329,11 @@ int main(int argc, char** argv)
     // Subcriber for trajectory future
     ros::Subscriber future_traj_sub = nh.subscribe<geometry_msgs::PoseArray>("/planning/traj_subset", 5, trajectoryCallback);
     // Subcriber for endpoint
-    ros::Subscriber getpoint_target_sub = nh.subscribe<geometry_msgs::PoseStamped>("/planning/endpoint_position", 10, endpointCallback);
+    ros::Subscriber getpoint_target_sub = nh.subscribe<geometry_msgs::PoseStamped>("/planning/local_target", 10, endpointCallback);
+    ros::Subscriber local_astar_active_sub = nh.subscribe<std_msgs::Bool>("/planning/local_astar_active", 10, activeAstarCallback);
+    ros::Subscriber local_apf_active_sub = nh.subscribe<std_msgs::Bool>("/planning/local_apf_active", 10, activeAPFCallback);
+    ros::Subscriber local_rrt_active_sub = nh.subscribe<std_msgs::Bool>("/planning/local_rrt_active", 10, activeRRTCallback);
+    
 
     // synchronized subscriber for pointcloud and odometry
     message_filters::Subscriber<nav_msgs::Odometry> odom_sub(nh, "/mavros/local_position/odom", 1);

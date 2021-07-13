@@ -51,6 +51,8 @@ class PlanningClient
     //localmap
     ros::Subscriber occ_trigger_sub;
     ros::Subscriber apf_force_sub;
+    ros::Subscriber local_waypoint_sub;
+    ros::Subscriber global_trigger_sub;
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
@@ -71,8 +73,14 @@ class PlanningClient
     ros::Publisher free_marker_pub;
     ros::Publisher dist_marker_pub;
 
+    //Local map publisher
     //Publisher send tracjetory pose to ring buffer
     ros::Publisher traj_subset_pub;
+    //Publish local goal to ringbuffer;
+    ros::Publisher local_target_pub;
+    ros::Publisher local_astar_active_pub;
+    ros::Publisher local_apf_active_pub;
+    ros::Publisher local_rrt_active_pub;
 
     DPlanning *drone_planning;
     void init(DPlanning *const drone_planning);

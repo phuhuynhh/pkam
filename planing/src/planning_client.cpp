@@ -15,7 +15,6 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	local_pos_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 10, &DPlanning::local_position_callback, drone_planning);
 	global_pos_sub = nh_->subscribe<sensor_msgs::NavSatFix>("/mavros/global_position/global", 10, &DPlanning::global_position_callback, drone_planning);
 	
-	
 	local_octomap_sub = nh_->subscribe<sensor_msgs::PointCloud2>("/octomap_point_cloud_centers", 10, &DPlanning::bin_octomap_callback, drone_planning);
 	octomap_sub = nh_->subscribe<octomap_msgs::Octomap>("/octomap_full", 10, &DPlanning::full_octomap_callback, drone_planning);
 
@@ -25,6 +24,8 @@ void PlanningClient::init(DPlanning *const drone_planning){
 
 	occ_trigger_sub = nh_->subscribe<std_msgs::Bool>("/mapping/has_occupied",10,&DPlanning::occ_trigger_callback, drone_planning);
 	apf_force_sub = nh_->subscribe<geometry_msgs::PoseStamped>("/mapping/distance_Sgrad",10,&DPlanning::apf_force_callback, drone_planning);
+	local_waypoint_sub = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints",10,&DPlanning::local_waypoint_callback, drone_planning);
+	global_trigger_sub = nh_->subscribe<std_msgs::Bool>("/mapping/global_trigger",10, &DPlanning::global_trigger_callback, drone_planning);
 
 	//For Planning process
 	/**
@@ -42,8 +43,12 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	//TODO : Need subcrible vel,acc for adding constraint.
 	raw_reference_pub = nh_->advertise<mavros_msgs::PositionTarget>("/planning/setpoint_raw", 10);
 
+	//local publisher
 	traj_subset_pub = nh_->advertise<geometry_msgs::PoseArray>("/planning/traj_subset",10);
-
+	local_target_pub = nh_->advertise<geometry_msgs::PoseStamped>("/planning/local_target",10);
+	local_astar_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_astar_active",10);
+	local_apf_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_apf_active",10);
+	local_rrt_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_rrt_active",10);
 
 	// message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh, "/mavros/local_position/odom", 1);
     // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh, "/camera/depth/color/points", 1);

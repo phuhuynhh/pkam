@@ -182,9 +182,10 @@ public:
 
 
 	//local map callback
-	void occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg);
-	void apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-	
+	void occ_trigger_callback(const std_msgs::BoolConstPtr &msg);
+	void apf_force_callback(const geometry_msgs::PoseStampedConstPtr &msg);
+	void local_waypoint_callback(const geometry_msgs::PoseArrayConstPtr &msg);
+	void global_trigger_callback(const std_msgs::BoolConstPtr &msg);
 
 	void public_local_position();
 	void run();
@@ -229,8 +230,10 @@ private:
 
 	// The starting time when follow global trajectory
 	double global_start_time;
+	double dt_global;
 	//The starting time when follow local trajectory
 	double local_start_time;
+	double dt_local;
 
 	long long worst_duration = 0;
 	long long best_duration = 100000000000000;
@@ -243,10 +246,9 @@ private:
 	mav_trajectory_generation::Trajectory global_trajectory;
 	//local trajectory
 	mav_trajectory_generation::Trajectory local_trajectory;
-
 	mav_msgs::EigenTrajectoryPoint::Vector states;
-
 	geometry_msgs::PoseStamped apf_vel;
+	geometry_msgs::PoseArray local_waypoints;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

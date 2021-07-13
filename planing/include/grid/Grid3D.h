@@ -81,7 +81,8 @@
       this->sizeZ = z;
 
       random_idx = std::uniform_int_distribution<int>(0, x*y*z-1);
-      Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.5, 0.5, 0.5));
+      Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.7, 0.7, 0.7));
+      
     }
 
     void Initilize(const octomap::point3d& origin);
