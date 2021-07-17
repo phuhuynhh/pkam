@@ -78,6 +78,22 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 
   //   temp_occupied_nodes = all_occupied_nodes;
   // }
+  bool Grid3D::isRayHit(const octomap::point3d& start,const octomap::point3d& end){
+    octomap::point3d direction = end - start;
+    float hypotenuse = direction.norm();
+    float total_distance = 0;
+    direction = direction.normalize();
+    octomap::point3d current_pos = start;
+    while(total_distance + resolution< hypotenuse){
+            total_distance += 0.1;
+            current_pos =  current_pos + direction*0.1;
+            if(isOccupied(current_pos)){
+                return true;
+            }
+        }
+    return false;
+  }
+
 
   void Grid3D::castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set){
     key_set.clear();
@@ -342,27 +358,11 @@ void Grid3D::Initilize(const octomap::point3d& origin){
   void Grid3D::getFreeNeighborIndex(const int &index, std::vector<int> &neighbor){
     neighbor.clear();
     std::vector<int> keyset;
-    if(isValidIndex(index+1) && !isOccupied(index+1)){
-      neighbor.push_back(index+1);
-    }
-    if(isValidIndex(index-1) && !isOccupied(index-1)){
-      neighbor.push_back(index-1);
-    }
-
-    if(isValidIndex(index+sizeX) && !isOccupied(index + sizeX)){
-      neighbor.push_back(index+sizeX);
-    }
-
-    if(isValidIndex(index-sizeX) && !isOccupied(index - sizeX)){
-      neighbor.push_back(index-sizeX);
-    }
-
-    if(isValidIndex(index+sizeX*sizeY) && !isOccupied(index+sizeX*sizeY)){
-      neighbor.push_back(index+sizeX*sizeY);
-    }
-
-    if(isValidIndex(index-sizeX*sizeY) && !isOccupied(index-sizeX*sizeY)){
-      neighbor.push_back(index-sizeX*sizeY);
+    getNeighborIndex(index, keyset);
+    for(std::vector<int>::iterator it = keyset.begin(); it != keyset.end(); ++it){
+      if(!isRayHit(toPosition(index), toPosition(*it)) && !isOccupied(*it)){
+        neighbor.push_back(*it);
+      }
     }
 
     return;
@@ -412,6 +412,22 @@ void Grid3D::Initilize(const octomap::point3d& origin){
 		return(collisionResult.isCollision());
   }
 
+  bool Grid3D::isOccupied(const octomap::point3d& position){
+    fcl::Vec3f translation(position.x(),position.y(),position.z());
+    fcl::Quaternion3f rotation((float)1, (float)0, (float)0, (float)0);
+
+    fcl::CollisionObject aircraftObject(Quadcopter);
+    fcl::CollisionObject treeObj((tree_obj));
+
+    aircraftObject.setTransform(rotation, translation);
+
+    fcl::CollisionRequest requestType(1,false,1,false);
+		fcl::CollisionResult collisionResult;
+		fcl::collide(&aircraftObject, &treeObj, requestType, collisionResult);
+
+		return(collisionResult.isCollision());
+  }
+
   bool Grid3D::isOccupied(const float& x, const float& y, const float& z){
     int index = toIndex(x, y, z);
     return isOccupied(index);
@@ -443,7 +459,7 @@ void Grid3D::Initilize(const octomap::point3d& origin){
   }
 
   void Grid3D::readOctomapMsg(const octomap_msgs::Octomap::ConstPtr& octomap){
-    octomap::OcTree* colorTree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*octomap));
+    colorTree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*octomap));
     fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(colorTree));
     tree_obj = std::shared_ptr<fcl::CollisionGeometry>(tree);
   }

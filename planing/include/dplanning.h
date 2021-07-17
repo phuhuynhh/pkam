@@ -125,6 +125,8 @@ public:
 		IDLE,
 		ASTAR_PLANNING,
 		APF,
+		VISUALIZATION_GLOBAL,
+		VISUALIZATION_LOCAL,
 		//MORE
 	};
 
@@ -160,8 +162,29 @@ public:
 	octomap_msgs::Octomap::ConstPtr octomap_msgs;
 
 
-	visualization_msgs::MarkerArray global_trajectory_markerarray;
+	//for visualization in rviz
 	visualization_msgs::MarkerArray d_way_points;
+	visualization_msgs::MarkerArray global_trajectory_markerarray;
+
+	visualization_msgs::Marker global_start_marker;
+	visualization_msgs::Marker global_end_marker;
+	visualization_msgs::Marker local_start_marker;
+	visualization_msgs::Marker local_end_marker;
+
+	visualization_msgs::MarkerArray global_waypoints_markerarray1;
+	visualization_msgs::MarkerArray global_waypoints_markerarray2;
+	visualization_msgs::MarkerArray global_waypoints_markerarray3;
+	visualization_msgs::MarkerArray global_waypoints_markerarray4;
+
+	visualization_msgs::MarkerArray global_trajectory_markerarray1;
+	visualization_msgs::MarkerArray global_trajectory_markerarray2;
+	visualization_msgs::MarkerArray global_trajectory_markerarray3;
+	visualization_msgs::MarkerArray global_trajectory_markerarray4;
+
+	visualization_msgs::MarkerArray local_trajectory_markerarray1;
+	visualization_msgs::MarkerArray local_trajectory_markerarray2;
+	visualization_msgs::MarkerArray local_trajectory_markerarray3;
+	visualization_msgs::MarkerArray local_trajectory_markerarray4;
 
 	// Saving init pose to home.
 	// geometry_msgs::PoseStamped target_position;
@@ -186,6 +209,11 @@ public:
 	void apf_force_callback(const geometry_msgs::PoseStampedConstPtr &msg);
 	void local_waypoint_callback(const geometry_msgs::PoseArrayConstPtr &msg);
 	void global_trigger_callback(const std_msgs::BoolConstPtr &msg);
+
+	void local_waypoint_callback1(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback2(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback3(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback4(const geometry_msgs::PoseArrayConstPtr &msg);
 
 	void public_local_position();
 	void run();
@@ -237,10 +265,6 @@ private:
 
 	long long worst_duration = 0;
 	long long best_duration = 100000000000000;
-
-	ompl::base::StateSpacePtr space;
-	ompl::base::SpaceInformationPtr si;
-	ompl::base::ProblemDefinitionPtr pdef;
 
 	//global trajectory
 	mav_trajectory_generation::Trajectory global_trajectory;

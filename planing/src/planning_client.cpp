@@ -27,6 +27,11 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	local_waypoint_sub = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints",10,&DPlanning::local_waypoint_callback, drone_planning);
 	global_trigger_sub = nh_->subscribe<std_msgs::Bool>("/mapping/global_trigger",10, &DPlanning::global_trigger_callback, drone_planning);
 
+	local_waypoint_sub1 = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints11",2,&DPlanning::local_waypoint_callback1,drone_planning);
+	local_waypoint_sub2 = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints22",2,&DPlanning::local_waypoint_callback2,drone_planning);
+	local_waypoint_sub3 = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints33",2,&DPlanning::local_waypoint_callback3,drone_planning);
+	local_waypoint_sub4 = nh_->subscribe<geometry_msgs::PoseArray>("/mapping/local_waypoints44",2,&DPlanning::local_waypoint_callback4,drone_planning);
+
 	//For Planning process
 	/**
 	* Trajectory get endpoint_position and create Movement Array
@@ -49,6 +54,28 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	local_astar_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_astar_active",10);
 	local_apf_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_apf_active",10);
 	local_rrt_active_pub = nh_->advertise<std_msgs::Bool>("/planning/local_rrt_active",10);
+
+	//visulization publsiher
+	globalmarker_start_pub = nh_->advertise<visualization_msgs::Marker>("/planning/global_start_marker", 10);
+	globalmarker_target_pub = nh_->advertise<visualization_msgs::Marker>("/planning/global_target_marker", 10);
+
+	localmarker_start_pub = nh_->advertise<visualization_msgs::Marker>("/planning/local_start_marker", 10);
+	localmarker_target_pub = nh_->advertise<visualization_msgs::Marker>("/planning/local_target_marker", 10);
+
+	global_waypoints_pub1 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_waypoints1", 10);
+	global_waypoints_pub2 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_waypoints2", 10);
+	global_waypoints_pub3 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_waypoints3", 10);
+	global_waypoints_pub4 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_waypoints4", 10);
+
+	global_trajectory_pub1 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_trajectory1", 10);
+	global_trajectory_pub2 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_trajectory2", 10);
+	global_trajectory_pub3 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_trajectory3", 10);
+	global_trajectory_pub4 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/global_trajectory4", 10);
+
+	local_trajectory_pub1 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/local_trajectory1", 10);
+	local_trajectory_pub2 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/local_trajectory2", 10);
+	local_trajectory_pub3 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/local_trajectory3", 10);
+	local_trajectory_pub4 = nh_->advertise<visualization_msgs::MarkerArray>("/planning/local_trajectory4", 10);
 
 	// message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh, "/mavros/local_position/odom", 1);
     // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh, "/camera/depth/color/points", 1);

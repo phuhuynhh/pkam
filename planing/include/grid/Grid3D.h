@@ -65,6 +65,7 @@
     std::default_random_engine generator;
     std::uniform_int_distribution<int> random_idx;
 
+    octomap::OcTree* colorTree;
     std::shared_ptr<fcl::CollisionGeometry> tree_obj;
     std::shared_ptr<fcl::CollisionGeometry> Quadcopter;
 
@@ -81,7 +82,7 @@
       this->sizeZ = z;
 
       random_idx = std::uniform_int_distribution<int>(0, x*y*z-1);
-      Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.7, 0.7, 0.7));
+      Quadcopter = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(resolution, resolution, resolution));
       
     }
 
@@ -91,6 +92,7 @@
 
     //Approprialy adjust edges cost when a node ocupanccy changeconst tf::Point
     // void HandleOccupancyChange(const int &node_index,const bool &change);
+    bool isRayHit(const octomap::point3d& start,const octomap::point3d& end);
 
     void castRay(const octomap::point3d& start,const octomap::point3d& end, std::vector<int>& key_set);
 
@@ -113,6 +115,8 @@
     bool isValidIndex(const int &x, const int &y, const int &z);
 
     bool isOccupied(const int& index);
+
+    bool isOccupied(const octomap::point3d& position);
 
     bool isOccupied(const float& x, const float& y, const float& z);
 

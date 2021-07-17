@@ -24,7 +24,7 @@ namespace ewok{
     std::vector<int> index_ray; // temporate storage for ray casting
     std::vector<int> neighborIdx; //temporate storage for neighbor finding
 
-    EuclideanDistanceRingBuffer<5>* rrb;
+    EuclideanDistanceRingBuffer<4>* rrb;
     // std::vector<Node> node_list;
     // std::vector<std::unordered_map<int, Edge>> adjency_list;
 
@@ -41,7 +41,7 @@ namespace ewok{
       this->sizeZ = z;
     }
 
-    void Initilize(const Eigen::Vector3f& origin, EuclideanDistanceRingBuffer<5>* ed_field){
+    void Initilize(const Eigen::Vector3f& origin, EuclideanDistanceRingBuffer<4>* ed_field){
         this->origin = origin;
         this->rrb = ed_field;
         corner(0) = origin(0)-static_cast<float>(sizeX-1)*resolution/2.0f;
@@ -115,27 +115,11 @@ namespace ewok{
     void getFreeNeighborIndex(const int &index, std::vector<int> &neighbor){
         neighbor.clear();
         std::vector<int> keyset;
-        if(isValidIndex(index+1) && !isOccupied(index+1)){
-        neighbor.push_back(index+1);
-        }
-        if(isValidIndex(index-1) && !isOccupied(index-1)){
-        neighbor.push_back(index-1);
-        }
-
-        if(isValidIndex(index+sizeX) && !isOccupied(index + sizeX)){
-        neighbor.push_back(index+sizeX);
-        }
-
-        if(isValidIndex(index-sizeX) && !isOccupied(index - sizeX)){
-        neighbor.push_back(index-sizeX);
-        }
-
-        if(isValidIndex(index+sizeX*sizeY) && !isOccupied(index+sizeX*sizeY)){
-        neighbor.push_back(index+sizeX*sizeY);
-        }
-
-        if(isValidIndex(index-sizeX*sizeY) && !isOccupied(index-sizeX*sizeY)){
-        neighbor.push_back(index-sizeX*sizeY);
+        getNeighborIndex(index, keyset);
+        for(std::vector<int>::iterator it = keyset.begin(); it != keyset.end(); ++it){
+            if(!isRayHit(toPosition(index), toPosition(*it)) && !isOccupied(*it)){
+                neighbor.push_back(*it);
+            }
         }
 
         return;
@@ -170,6 +154,14 @@ namespace ewok{
         }
         Eigen::Vector3f pos = toPosition(index);
 
+        if(rrb->getDistanceWithGrad(pos, Eigen::Vector3f()) < 0.7){
+            return true;
+        }
+
+        return false;
+    }
+
+    bool isOccupied(const Eigen::Vector3f& pos){
         if(rrb->getDistanceWithGrad(pos, Eigen::Vector3f()) < 0.7){
             return true;
         }

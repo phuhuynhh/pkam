@@ -1,8 +1,10 @@
 #include <ewok/ed_ring_buffer.h>
 #include <ewok/APF.h>
 #include <ewok/Astar.h>
+#include <ewok/RingStateValidator.h>
 #include <ros/ros.h>
 #include <math.h>       /* isnan, sqrt */
+#include <chrono>
 
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
@@ -35,8 +37,23 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/Pose.h>
 
+#include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/RealVectorStateSpace.h>
+#include <ompl/base/OptimizationObjective.h>
+#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/InformedRRTstar.h>
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/geometric/PathGeometric.h>
 
+#include <mav_trajectory_generation/polynomial_optimization_linear.h>
+#include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
+#include <mav_trajectory_generation/trajectory.h>
+#include <mav_trajectory_generation/trajectory_sampling.h>
+#include <mav_trajectory_generation_ros/ros_visualization.h>
 
+#include <visualization_msgs/MarkerArray.h>
 
 using namespace message_filters;
 
@@ -44,8 +61,8 @@ using namespace message_filters;
 ros::Time _last_time;
 
 bool initialized = false;
-const double resolution = 0.5;
-static const int POW = 5;
+const double resolution = 0.4;
+static const int POW = 4;
 static const int N = (1 << POW);
 ewok::EuclideanDistanceRingBuffer<POW> rrb(resolution, 5.0);
 
@@ -56,6 +73,27 @@ double map_rate, pub_rate;
 std::string m_worldFrameId = "/map";
 
 ros::Publisher occ_trigger_pub, apf_grad_pub, local_waypoint_pub, global_trigger_pub; // can has more.
+
+ros::Publisher local_waypoints_pub1;
+ros::Publisher local_waypoints_pub2;
+ros::Publisher local_waypoints_pub3;
+ros::Publisher local_waypoints_pub4;
+
+ros::Publisher local_waypoints_pub11;
+ros::Publisher local_waypoints_pub22;
+ros::Publisher local_waypoints_pub33;
+ros::Publisher local_waypoints_pub44;
+
+visualization_msgs::MarkerArray local_waypoints_markerarray1;
+visualization_msgs::MarkerArray local_waypoints_markerarray2;
+visualization_msgs::MarkerArray local_waypoints_markerarray3;
+visualization_msgs::MarkerArray local_waypoints_markerarray4;
+
+geometry_msgs::PoseArray local_waypoints_markerarray11;
+geometry_msgs::PoseArray local_waypoints_markerarray22;
+geometry_msgs::PoseArray local_waypoints_markerarray33;
+geometry_msgs::PoseArray local_waypoints_markerarray44;
+
 Eigen::Vector3f global_origin;
 Eigen::Vector3f local_target;
 
@@ -66,15 +104,13 @@ bool local_astar_active = false;
 bool local_rrt_active = false;
 
 ewok::APF AP_field;
-ewok::Grid3D Grid(100,100,20,1.0);
+ewok::Grid3D Grid(100,100,8,0.5);
 
 void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud)
 {
     double elp = ros::Time::now().toSec() - _last_time.toSec();
     // if(elp < (1 / map_rate)) return;
     
-
-
     tf2::Quaternion q_orig, q_rot, q_new;
     // Get the original orientation of 'commanded_pose'
     tf2::convert(odom->pose.pose.orientation , q_orig);
@@ -219,10 +255,10 @@ void timerCallback(const ros::TimerEvent& e)
     if(local_astar_active){
         Grid.Initilize(global_origin, &rrb);
         ewok::Astar astar(local_target, &Grid);
+        std::vector<Eigen::Vector3f> path;
         std::vector<Eigen::Vector3f> node_index;
         ROS_INFO("LOCAL_ASTAR_ACTIVE");
-        bool solved = astar.find_path(global_origin, node_index, 500);
-        ROS_INFO("LOCAL_ASTAR_ACTIVE1");
+        bool solved = astar.find_path(global_origin,path, node_index, 500);
         if(solved){
             geometry_msgs::PoseArray local_waypoints;
             for(std::vector<Eigen::Vector3f>::iterator it = node_index.begin(); it != node_index.end(); ++it){
@@ -247,17 +283,365 @@ void timerCallback(const ros::TimerEvent& e)
         return;
     }
 
+    if(local_rrt_active){
+        Grid.Initilize(global_origin, &rrb);
+        ewok::Astar astar(local_target, &Grid);
+        std::vector<Eigen::Vector3f> path;
+        std::vector<Eigen::Vector3f> node_index;
+        ROS_INFO("LOCAL_ASTAR_ACTIVE");
+        bool solved = astar.find_path(global_origin,path, node_index, 500);
+
+        if(solved){
+                        ROS_INFO("BREAK POINT");
+                        mav_trajectory_generation::Trajectory global_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						int marr_index = 0;
+                        ROS_INFO("BREAK POINT BEFORE LOOP");
+						local_waypoints_markerarray1.markers.clear();
+						for(std::vector<Eigen::Vector3f>::iterator it = path.begin(); it != path.end(); ++it){
+							visualization_msgs::Marker mk;
+                            Eigen::Vector3f pos((*it)(0), (*it)(1), (*it)(2));
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = (*it)(0);
+							mk.pose.position.y = (*it)(1);
+							mk.pose.position.z = (*it)(2);
+							mk.color.r = 1.0;
+                            mk.color.g = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							local_waypoints_markerarray1.markers.push_back(mk);
+
+                            geometry_msgs::Pose pose;
+                            pose.position.x = (*it)(0);
+                            pose.position.y = (*it)(1);
+                            pose.position.z = (*it)(2);
+                            local_waypoints_markerarray11.poses.push_back(pose);
+
+						}
+                        local_waypoints_pub11.publish(local_waypoints_markerarray11);
+					
+        }
+        else{
+            ROS_INFO("ASTAR FAIL TO FIND PATH IN LOCAL MAP");
+            std_msgs::Bool global_trigger;
+            global_trigger.data = true;
+            global_trigger_pub.publish(global_trigger);
+        } 
+
+        if(solved){
+            mav_trajectory_generation::Trajectory global_trajectory2;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						int marr_index = 0;
+						local_waypoints_markerarray2.markers.clear();
+						for(std::vector<Eigen::Vector3f>::iterator it = node_index.begin(); it != node_index.end(); ++it){
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = (*it)(0);
+							mk.pose.position.y = (*it)(1);
+							mk.pose.position.z = (*it)(2);
+							mk.color.r = 1.0;
+                            mk.color.g = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							local_waypoints_markerarray2.markers.push_back(mk);
+
+                            geometry_msgs::Pose pose;
+                            pose.position.x = (*it)(0);
+                            pose.position.y = (*it)(1);
+                            pose.position.z = (*it)(2);
+                            local_waypoints_markerarray22.poses.push_back(pose);
+
+						}
+                        local_waypoints_pub22.publish(local_waypoints_markerarray22);
+        }
+        else{
+            ROS_INFO("ASTAR FAIL TO FIND PATH IN LOCAL MAP");
+            std_msgs::Bool global_trigger;
+            global_trigger.data = true;
+            global_trigger_pub.publish(global_trigger);
+        }      
+
+        ompl::base::StateSpacePtr space;
+		ompl::base::SpaceInformationPtr si;
+	
+		space = ompl::base::StateSpacePtr(new ompl::base::SE3StateSpace());
+
+				    // create a start state
+					ompl::base::ScopedState<ompl::base::SE3StateSpace> start(space);
+					// create a goal state
+					ompl::base::ScopedState<ompl::base::SE3StateSpace> goal(space);
+					// set the bounds for the R^3 part of SE(3)
+					ompl::base::RealVectorBounds bounds(3);
+
+					//TODO : Assign Khang VO.
+					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
+					// bounds.setLow(0, _min_bounds[0]);
+					// bounds.setHigh(0, _max_bounds[0]);
+					// bounds.setLow(1,  _min_bounds[1]);
+					// bounds.setHigh(1,  _max_bounds[1]);
+					// bounds.setLow(2, 1.5);
+					// bounds.setHigh(2, 2.5);
+
+					bounds.setLow(0, -40);
+					bounds.setHigh(0, 40);
+					bounds.setLow(1,  -5);
+					bounds.setHigh(1,  5);
+					bounds.setLow(2, 1.0);
+					bounds.setHigh(2, 3.0);
+
+					space->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
+
+					// construct an instance of  space information from this state space
+					si = ompl::base::SpaceInformationPtr(new ompl::base::SpaceInformation(space));
+					start->setXYZ(global_origin(0),
+						global_origin(1),
+						global_origin(2));
+					start->as<ompl::base::SO3StateSpace::StateType>(1)->setIdentity(); // start.random();
+					goal->setXYZ(local_target(0),
+						local_target(1),
+						local_target(2));
+					goal->as<ompl::base::SO3StateSpace::StateType>(1)->setIdentity();
+					// goal.random();
+
+					// set state validity checking for this space
+					std::shared_ptr<ewok::RingStateValidator> validity_checker(new ewok::RingStateValidator(si, &rrb));
+					si->setStateValidityChecker(validity_checker);
+
+					// create a problem instance
+					ompl::base::ProblemDefinitionPtr pdef1 = ompl::base::ProblemDefinitionPtr(new ompl::base::ProblemDefinition(si));
+					// set the start and goal states
+					pdef1->setStartAndGoalStates(start, goal);
+					// set Optimizattion objective
+					ompl::base::OptimizationObjectivePtr obj1(new ompl::base::PathLengthOptimizationObjective(si));
+					obj1->setCostToGoHeuristic(&ompl::base::goalRegionCostToGo);
+					pdef1->setOptimizationObjective(obj1);
+
+					// create a problem instance
+					ompl::base::ProblemDefinitionPtr pdef2 = ompl::base::ProblemDefinitionPtr(new ompl::base::ProblemDefinition(si));
+					// set the start and goal states
+					pdef2->setStartAndGoalStates(start, goal);
+					// set Optimizattion objective
+					ompl::base::OptimizationObjectivePtr obj2(new ompl::base::PathLengthOptimizationObjective(si));
+					obj2->setCostToGoHeuristic(&ompl::base::goalRegionCostToGo);
+					pdef2->setOptimizationObjective(obj2);
+
+					ompl::base::PlannerPtr plan1(new ompl::geometric::RRTstar(si));
+					// set the problem we are trying to solve for the planner
+					plan1->setProblemDefinition(pdef1);
+					// perform setup steps for the planner
+					plan1->setup();
+					// attempt to solve the problem within one second of planning time
+
+					auto time_start1 = std::chrono::high_resolution_clock::now(); 
+					ompl::base::PlannerStatus solved1 = plan1->solve(0.01);
+					auto time_end1 = std::chrono::high_resolution_clock::now();
+      				auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end1 - time_start1);
+					ROS_INFO("TIME FOR RRT SOLVE: %d", duration1);
+
+					ompl::base::PlannerPtr plan2(new ompl::geometric::InformedRRTstar(si));
+					// set the problem we are trying to solve for the planner
+					plan2->setProblemDefinition(pdef2);
+					// perform setup steps for the planner
+					plan2->setup();
+					// attempt to solve the problem within one second of planning time
+					auto time_start2 = std::chrono::high_resolution_clock::now(); 
+					ompl::base::PlannerStatus solved2 = plan2->solve(0.01);
+					auto time_end2 = std::chrono::high_resolution_clock::now();
+      				auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end2 - time_start2);
+					ROS_INFO("TIME FOR INFORMED RRT SOLVE: %d", duration2);
+
+                    if (solved1)
+					{
+						int marr_index = 0;
+						local_waypoints_markerarray3.markers.clear();	
+						// Path smoothing using bspline
+						// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+						// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+						// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+
+						// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+						// // Using 5, as is the default value of the function
+						// // If the path is not smooth, the value of smoothness() will be closer to 1
+						// int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+						// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+						// ROS_INFO("Smoothed Path\n");
+						// _path_smooth->print(std::cout);
+						mav_trajectory_generation::Trajectory global_trajectory3;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						ompl::geometric::PathGeometric *path = pdef1->getSolutionPath()->as<ompl::geometric::PathGeometric>();
+						ROS_INFO("RRT STAR SOLUTION STATE: %d", path->getStateCount());
+						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
+						{
+							const ompl::base::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ompl::base::SE3StateSpace::StateType>();
+
+							// extract the first component of the state and cast it to what we expect
+							const ompl::base::RealVectorStateSpace::StateType *pos = se3state->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+							// extract the second component of the state and cast it to what we expect
+							const ompl::base::SO3StateSpace::StateType *rot = se3state->as<ompl::base::SO3StateSpace::StateType>(1);
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos->values[0];
+							mk.pose.position.y = pos->values[1];
+							mk.pose.position.z = pos->values[2];
+							mk.color.r = 1.0;
+                            mk.color.g = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							local_waypoints_markerarray3.markers.push_back(mk);
+
+                            geometry_msgs::Pose pose;
+                            pose.position.x = pos->values[0];
+                            pose.position.y = pos->values[1];
+                            pose.position.z = pos->values[2];
+                            local_waypoints_markerarray33.poses.push_back(pose);
+
+						}
+                        local_waypoints_pub33.publish(local_waypoints_markerarray33);
+
+					}
+					else
+					{
+                        std_msgs::Bool global_trigger;
+                        global_trigger.data = true;
+                        global_trigger_pub.publish(global_trigger);
+						ROS_INFO("FAILED TO FIND LOCAL PATH WITH OMPL-RRT");
+					}
+
+                    if (solved2)
+					{
+						int marr_index = 0;
+						local_waypoints_markerarray4.markers.clear();	
+						// Path smoothing using bspline
+						// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+						// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+						// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+
+						// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+						// // Using 5, as is the default value of the function
+						// // If the path is not smooth, the value of smoothness() will be closer to 1
+						// int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+						// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+						// ROS_INFO("Smoothed Path\n");
+						// _path_smooth->print(std::cout);
+						mav_trajectory_generation::Trajectory global_trajectory4;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						ompl::geometric::PathGeometric *path = pdef2->getSolutionPath()->as<ompl::geometric::PathGeometric>();
+						ROS_INFO("INFORMED RRT STAR SOLUTION STATE: %d", path->getStateCount());
+						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
+						{
+							const ompl::base::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ompl::base::SE3StateSpace::StateType>();
+
+							// extract the first component of the state and cast it to what we expect
+							const ompl::base::RealVectorStateSpace::StateType *pos = se3state->as<ompl::base::RealVectorStateSpace::StateType>(0);
+
+							// extract the second component of the state and cast it to what we expect
+							const ompl::base::SO3StateSpace::StateType *rot = se3state->as<ompl::base::SO3StateSpace::StateType>(1);
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos->values[0];
+							mk.pose.position.y = pos->values[1];
+							mk.pose.position.z = pos->values[2];
+							mk.color.r = 1.0;
+                            mk.color.g = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							local_waypoints_markerarray4.markers.push_back(mk);
+
+                            geometry_msgs::Pose pose;
+                            pose.position.x = pos->values[0];
+                            pose.position.y = pos->values[1];
+                            pose.position.z = pos->values[2];
+                            local_waypoints_markerarray44.poses.push_back(pose);
+
+						}
+                        local_waypoints_pub44.publish(local_waypoints_markerarray44);
+					}
+					else
+					{
+                        std_msgs::Bool global_trigger;
+                        global_trigger.data = true;
+                        global_trigger_pub.publish(global_trigger);
+						ROS_INFO("FAILED TO FIND LOCAL PATH WITH OMPL-RRT");
+					}
+        trajectory_subset.poses.clear();        
+        local_rrt_active = false;        
+    }
+
+    local_waypoints_pub1.publish(local_waypoints_markerarray1);
+    local_waypoints_pub2.publish(local_waypoints_markerarray2);
+    local_waypoints_pub3.publish(local_waypoints_markerarray3);
+    local_waypoints_pub4.publish(local_waypoints_markerarray4);
+
     for(std::vector<geometry_msgs::Pose>::iterator it = trajectory_subset.poses.begin(); it !=  trajectory_subset.poses.end(); ++it){
         Eigen::Vector3f grad;
         Eigen::Vector3f check_point(it->position.x, it->position.y, it->position.z);
         float distance = rrb.getDistanceWithGrad(check_point, grad);
-        if(distance < 0.5){
+        if(distance < 0.3){
             std_msgs::Bool local_collision;
             local_collision.data = true;                
             occ_trigger_pub.publish(local_collision);
             ROS_INFO("FUTURE COLLISION");
             break;
         }
+        
     }
 
     trajectory_subset.poses.clear();
@@ -311,6 +695,17 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "realtime_example");
     ros::NodeHandle nh;
+
+    //for waypoint visualization
+    local_waypoints_pub1 = nh.advertise<visualization_msgs::MarkerArray>("/mapping/local_waypoints1", 10);
+	local_waypoints_pub2 = nh.advertise<visualization_msgs::MarkerArray>("/mapping/local_waypoints2", 10);
+	local_waypoints_pub3 = nh.advertise<visualization_msgs::MarkerArray>("/mapping/local_waypoints3", 10);
+	local_waypoints_pub4 = nh.advertise<visualization_msgs::MarkerArray>("/mapping/local_waypoints4", 10);
+
+    local_waypoints_pub11 = nh.advertise<geometry_msgs::PoseArray>("/mapping/local_waypoints11", 10);
+    local_waypoints_pub22 = nh.advertise<geometry_msgs::PoseArray>("/mapping/local_waypoints22", 10);
+    local_waypoints_pub33 = nh.advertise<geometry_msgs::PoseArray>("/mapping/local_waypoints33", 10);
+    local_waypoints_pub44 = nh.advertise<geometry_msgs::PoseArray>("/mapping/local_waypoints44", 10);
 
     //Local Mapping Controller 
     occ_trigger_pub = nh.advertise<std_msgs::Bool>("/mapping/has_occupied", 1, true);

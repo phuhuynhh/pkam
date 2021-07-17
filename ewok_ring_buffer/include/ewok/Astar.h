@@ -8,6 +8,10 @@
 #include <octomap/octomap.h>
 #include <map>
 #include <algorithm>
+#include <chrono>
+
+#include <ros/ros.h>
+#include <ros/subscribe_options.h>
 
 #include <Eigen/Dense>
 namespace ewok{
@@ -25,8 +29,10 @@ public:
     }
 
     bool find_path(const Eigen::Vector3f& start_point,
-                        std::vector<Eigen::Vector3f>& path_way,
+                        std::vector<Eigen::Vector3f>& path,
+                        std::vector<Eigen::Vector3f>& path_smooth,
                         const unsigned int& iteration){
+        auto start = std::chrono::high_resolution_clock::now();            
         int start_idx = grid->toIndex(start_point(0), start_point(1), start_point(2));
         int end_idx = grid->toIndex(target(0), target(1), target(2));
 
@@ -53,13 +59,23 @@ public:
             int top_key = queue.pop_value(false);
             if(top_key == end_idx){
                 Node goal_node = node_map[end_idx];
-                printf("Astar find a goal with cost: %f, number of state expand: %d, iteration: %d", ((float) goal_node.getG())/1000.0, node_map.size(), i);
-                std::vector<Eigen::Vector3f> path;
                 return_path(start_idx, end_idx, path);
+                auto end1 = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start);
                 path.insert(path.begin(), start_point);
                 path.push_back(target);
-                path_pruning(path, path_way);
-                return true; // TODO, set the path to node_index
+                ROS_INFO("Astar find a goal with cost: %f, number of state expand: %d, number of waypoints: %d, iteration: %d, in time: %d", ((float) goal_node.getG())/1000.0, node_map.size(), path.size(),i, duration);
+
+
+                path_pruning(path, path_smooth);
+                float cost = 0;
+                for(int i = 0; i < path_smooth.size() -1; i++){
+                    cost += (path_smooth[i] - path_smooth[i+1]).norm();
+                }
+                auto end2 = std::chrono::high_resolution_clock::now();
+                auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start);
+                ROS_INFO("Astar smoothing find a goal with cost: %f, number of state expand: %d,  number of waypoints: %d,iteration: %d, in time: %d", cost, node_map.size(),path_smooth.size(), i, duration2);
+                return true; // TODO, set the path to node_index                                                  
             }
             grid->getFreeNeighborIndex(top_key, expand);
 
@@ -94,10 +110,14 @@ public:
     void path_pruning(std::vector<Eigen::Vector3f>& input_path, std::vector<Eigen::Vector3f>& output_path){
         output_path.clear();
         int current_index = 0;
-        output_path.push_back( input_path[current_index]);
+        output_path.push_back(input_path[current_index]);
         while(current_index < input_path.size()-1){
             int next_index = current_index;
             for(int i = current_index; i < input_path.size(); i++){
+                if(i == current_index + 1){
+                    next_index = i;
+                }
+                
                 if(!grid->isRayHit(input_path[current_index], input_path[i])){
                     next_index = i;
                 }
