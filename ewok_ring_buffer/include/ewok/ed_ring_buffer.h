@@ -24,15 +24,13 @@
 #ifndef EWOK_RING_BUFFER_INCLUDE_EWOK_ED_RING_BUFFER_H_
 #define EWOK_RING_BUFFER_INCLUDE_EWOK_ED_RING_BUFFER_H_
 
-#include <ewok/raycast_ring_buffer.hpp>
+#include <ewok/raycast_ring_buffer.h>
 
 #include <vector>
 #include <deque>
 
-
-
-
 namespace ewok {
+
 template<int _POW, typename _Datatype = int16_t,
     typename _Scalar = float, typename _Flag = uint8_t>
 class EuclideanDistanceRingBuffer {

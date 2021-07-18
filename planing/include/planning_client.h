@@ -51,6 +51,13 @@ class PlanningClient
     //localmap
     ros::Subscriber occ_trigger_sub;
     ros::Subscriber apf_force_sub;
+    ros::Subscriber local_waypoint_sub;
+    ros::Subscriber global_trigger_sub;
+
+    ros::Subscriber local_waypoint_sub1;
+    ros::Subscriber local_waypoint_sub2;
+    ros::Subscriber local_waypoint_sub3;
+    ros::Subscriber local_waypoint_sub4; 
 
     // end point for path-planning.
     ros::Subscriber getpoint_target_sub;
@@ -66,12 +73,41 @@ class PlanningClient
     ros::Publisher vel_marker_pub;
     ros::Publisher way_points_pub;
 
+    // Visualize Trajectory
+    ros::Publisher globalmarker_start_pub;
+    ros::Publisher globalmarker_target_pub;
+
+    ros::Publisher localmarker_start_pub;
+    ros::Publisher localmarker_target_pub;
+
+    ros::Publisher global_waypoints_pub1;
+    ros::Publisher global_waypoints_pub2;
+    ros::Publisher global_waypoints_pub3;
+    ros::Publisher global_waypoints_pub4;
+
+    ros::Publisher global_trajectory_pub1;
+    ros::Publisher global_trajectory_pub2;
+    ros::Publisher global_trajectory_pub3;
+    ros::Publisher global_trajectory_pub4;
+
+    ros::Publisher local_trajectory_pub1;
+    ros::Publisher local_trajectory_pub2;
+    ros::Publisher local_trajectory_pub3;
+    ros::Publisher local_trajectory_pub4;
+
     //Local-Map visualize marker
     ros::Publisher occ_marker_pub;
     ros::Publisher free_marker_pub;
     ros::Publisher dist_marker_pub;
 
-
+    //Local map publisher
+    //Publisher send tracjetory pose to ring buffer
+    ros::Publisher traj_subset_pub;
+    //Publish local goal to ringbuffer;
+    ros::Publisher local_target_pub;
+    ros::Publisher local_astar_active_pub;
+    ros::Publisher local_apf_active_pub;
+    ros::Publisher local_rrt_active_pub;
 
     DPlanning *drone_planning;
     void init(DPlanning *const drone_planning);

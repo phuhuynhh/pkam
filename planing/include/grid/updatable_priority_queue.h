@@ -34,7 +34,7 @@
 				/** first is priority, second is key */
 				const priority_queue_node<Key,Priority>& top();
 
-				void pop(bool remember_); //pop=false
+				void pop(bool remember_pop); //pop=false
 
 				Key pop_value(bool remember_key); //remember_key=true
 

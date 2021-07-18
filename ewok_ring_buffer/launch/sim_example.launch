@@ -1,0 +1,8 @@
+<launch>
+    <node name="ring_buffer" pkg="ewok_ring_buffer" type="sim_example" output="screen">
+
+      <param name="map_rate" value="100" type="double"/>
+      <param name="publish_rate" value="1" type="double"/>
+
+    </node>
+</launch>

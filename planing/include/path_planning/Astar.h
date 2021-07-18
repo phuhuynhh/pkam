@@ -25,10 +25,13 @@ public:
   }
 
   bool find_path(const octomap::point3d& start_point,
-                        std::vector<int>& node_index,
+                        std::vector<octomap::point3d>& path,
+                        std::vector<octomap::point3d>& path_smooth,
                         const unsigned int& iteration);
 
-  void return_path(const int& start_key, const int& end_key, std::vector<int>& node_index);
+  void return_path(const int& start_key, const int& end_key, std::vector<octomap::point3d>& node_index);
+
+  void path_pruning(std::vector<octomap::point3d>& input_path, std::vector<octomap::point3d>& output_path);
 
   void extend_id(int idx);
 

@@ -53,8 +53,10 @@
 #include <mavros_msgs/GlobalPositionTarget.h>
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
 
@@ -117,10 +119,14 @@ public:
 	enum class PLANNING_STEP {
 		TAKE_OFF,
 		GLOBAL_PLANNING,
-		FOLLOW_TRAJECTORY,
+		FOLLOW_GLOBAl_TRAJECTORY,
 		LOCAL_PLANNING,
+		FOLLOW_LOCAL_TRAJECTORY,
 		IDLE,
 		ASTAR_PLANNING,
+		APF,
+		VISUALIZATION_GLOBAL,
+		VISUALIZATION_LOCAL,
 		//MORE
 	};
 
@@ -156,8 +162,29 @@ public:
 	octomap_msgs::Octomap::ConstPtr octomap_msgs;
 
 
-	visualization_msgs::MarkerArray global_trajectory;
+	//for visualization in rviz
 	visualization_msgs::MarkerArray d_way_points;
+	visualization_msgs::MarkerArray global_trajectory_markerarray;
+
+	visualization_msgs::Marker global_start_marker;
+	visualization_msgs::Marker global_end_marker;
+	visualization_msgs::Marker local_start_marker;
+	visualization_msgs::Marker local_end_marker;
+
+	visualization_msgs::MarkerArray global_waypoints_markerarray1;
+	visualization_msgs::MarkerArray global_waypoints_markerarray2;
+	visualization_msgs::MarkerArray global_waypoints_markerarray3;
+	visualization_msgs::MarkerArray global_waypoints_markerarray4;
+
+	visualization_msgs::MarkerArray global_trajectory_markerarray1;
+	visualization_msgs::MarkerArray global_trajectory_markerarray2;
+	visualization_msgs::MarkerArray global_trajectory_markerarray3;
+	visualization_msgs::MarkerArray global_trajectory_markerarray4;
+
+	visualization_msgs::MarkerArray local_trajectory_markerarray1;
+	visualization_msgs::MarkerArray local_trajectory_markerarray2;
+	visualization_msgs::MarkerArray local_trajectory_markerarray3;
+	visualization_msgs::MarkerArray local_trajectory_markerarray4;
 
 	// Saving init pose to home.
 	// geometry_msgs::PoseStamped target_position;
@@ -178,9 +205,15 @@ public:
 
 
 	//local map callback
-	void occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg);
-	void apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg);
-	
+	void occ_trigger_callback(const std_msgs::BoolConstPtr &msg);
+	void apf_force_callback(const geometry_msgs::PoseStampedConstPtr &msg);
+	void local_waypoint_callback(const geometry_msgs::PoseArrayConstPtr &msg);
+	void global_trigger_callback(const std_msgs::BoolConstPtr &msg);
+
+	void local_waypoint_callback1(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback2(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback3(const geometry_msgs::PoseArrayConstPtr &msg);
+	void local_waypoint_callback4(const geometry_msgs::PoseArrayConstPtr &msg);
 
 	void public_local_position();
 	void run();
@@ -210,6 +243,8 @@ private:
 	geometry_msgs::PoseStamped endpoint_pos_ENU; 
 	sensor_msgs::PointCloud2 octomap_cloud;
 
+	// Array of future position of trajectory for replanning checking
+	geometry_msgs::PoseArray trajectory_subset;
 
 	// Space bounds
   	double _min_bounds[3];
@@ -218,17 +253,26 @@ private:
   	double _prev_goal[7];
 
 	// Target_position
-	ros::Time start_time;
-	ros::Time pre_time;
+	double start_time;
+	double pre_time;
+
+	// The starting time when follow global trajectory
+	double global_start_time;
+	double dt_global;
+	//The starting time when follow local trajectory
+	double local_start_time;
+	double dt_local;
 
 	long long worst_duration = 0;
 	long long best_duration = 100000000000000;
 
-	ompl::base::StateSpacePtr space;
-	ompl::base::SpaceInformationPtr si;
-	ompl::base::ProblemDefinitionPtr pdef;
-	mav_trajectory_generation::Trajectory trajectory;
+	//global trajectory
+	mav_trajectory_generation::Trajectory global_trajectory;
+	//local trajectory
+	mav_trajectory_generation::Trajectory local_trajectory;
 	mav_msgs::EigenTrajectoryPoint::Vector states;
+	geometry_msgs::PoseStamped apf_vel;
+	geometry_msgs::PoseArray local_waypoints;
 
 	double currentYaw();
 	double getYaw(const geometry_msgs::Quaternion &msg);

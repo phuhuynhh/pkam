@@ -1,7 +1,5 @@
 #include "dplanning.h"
-
-
-
+#include <chrono>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -39,6 +37,7 @@ void DPlanning::run()
 
 		pcl::PointCloud<pcl::PointXYZ> temp_cloud;
 
+		double local_ahead_time = 20.0;
 		if (octomap_activate)
 		{
 			pcl::fromROSMsg(octomap_cloud, temp_cloud);
@@ -74,7 +73,7 @@ void DPlanning::run()
 				{
 					if (distance(d_local_position, endpoint_pos_ENU) < 0.2)
 					{
-						double travel_time = ros::Time::now().toSec() - start_time.toSec();
+						double travel_time = ros::Time::now().toSec() - start_time;
 						ROS_INFO("Distance : %f", distance(d_local_position, endpoint_pos_ENU));
 						ROS_INFO("Time : %f", travel_time);
 						ROS_INFO("Travel distance : %f", travel_cost);
@@ -138,12 +137,142 @@ void DPlanning::run()
 					// // publishVisualize();
 					// ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
-					break;
+					// we get 10 second ahead of time in the global trajectory as the local destination
+
+					if(local_waypoints.poses.size() == 0){
+						// this->planning_type = PLANNING_STEP::IDLE;
+						break;
+					}
+					else{
+
+						ROS_INFO("RECEIVED LOCAL WAYPOINTS SIZE: %d", local_waypoints.poses.size());
+						int marr_index = 0;
+
+						double dt = dt_global;
+						double d_future = dt + local_ahead_time;
+
+						//The current position from time
+						Eigen::VectorXd position_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
+						Eigen::VectorXd vel_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
+						Eigen::VectorXd acce_d = global_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+
+						Eigen::VectorXd target_position_d;
+						Eigen::VectorXd target_vel_d;
+						Eigen::VectorXd target_acce_d;
+						//Target position from time
+						if(dt + local_ahead_time > global_trajectory.getMaxTime()){
+							dt_global = global_trajectory.getMaxTime() - 0.00001;
+							target_position_d = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, mav_trajectory_generation::derivative_order::POSITION);
+							target_vel_d = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, mav_trajectory_generation::derivative_order::VELOCITY);
+							target_acce_d = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, mav_trajectory_generation::derivative_order::ACCELERATION);
+						}
+						else{
+							dt_global = d_future;
+							target_position_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+							target_vel_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::VELOCITY);
+							target_acce_d = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::ACCELERATION);
+						}
+
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+							
+						for (int path_idx = 0; path_idx < local_waypoints.poses.size(); path_idx++)
+						{
+
+							// visualization_msgs::Marker mk;
+							// mk.id = marr_index;
+							// mk.type = mk.CUBE;
+							// marr_index += 1;
+							// mk.header.frame_id = "map";
+							// mk.pose.position.x = pos->values[0];
+							// mk.pose.position.y = pos->values[1];
+							// mk.pose.position.z = pos->values[2];
+							// mk.color.r = 1.0;
+							// mk.color.a = 1.0;
+							// mk.scale.x = 0.2;
+							// mk.scale.y = 0.2;
+							// mk.scale.z = 0.2;
+							// this->d_way_points.markers.push_back(mk);
+							geometry_msgs::Pose pos = local_waypoints.poses[path_idx]; 
+
+							if (path_idx == 0){
+								start.makeStartOrEnd(Eigen::Vector3d(pos.position.x, pos.position.y, pos.position.z), derivative_to_optimize);
+								// // set start point's velocity to be constrained to current velocity
+								// start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(vel_d(0), vel_d(1), vel_d(2)));
+								// start.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(acce_d(0), acce_d(1), acce_d(2)));
+								vertices.push_back(start);
+							}
+							else if (path_idx == local_waypoints.poses.size() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(pos.position.x, pos.position.y, pos.position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								// end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(target_vel_d(0), target_vel_d(1), target_vel_d(2)));
+								// end.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(target_acce_d(0), target_acce_d(1), target_acce_d(2)));
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos.position.x, pos.position.y, pos.position.z));
+								vertices.push_back(vertex);
+							}
+						}
+						local_waypoints.poses.clear();
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						// solve trajectory
+						opt.optimize();
+						opt.getTrajectory(&local_trajectory);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						// Whole trajectory:
+						// double sampling_interval = 0.05;
+						// bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
+
+						// double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// // From Trajectory class:
+						// mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
+						// ros_client->way_points_pub.publish(d_way_points);
+						// ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						local_start_time = ros::Time::now().toSec();
+						pre_time = 0;
+						this->planning_type = PLANNING_STEP::FOLLOW_LOCAL_TRAJECTORY;
+						break;
+					} 
+
 				}
 				case PLANNING_STEP::GLOBAL_PLANNING:
 				{
-					global_trajectory.markers.clear();
+					global_trajectory_markerarray.markers.clear();
 					d_way_points.markers.clear();
+
+					ompl::base::StateSpacePtr space;
+					ompl::base::SpaceInformationPtr si;
+					ompl::base::ProblemDefinitionPtr pdef;
+
 					space = ob::StateSpacePtr(new ob::SE3StateSpace());
 
 					// create a start state
@@ -155,12 +284,19 @@ void DPlanning::run()
 
 					//TODO : Assign Khang VO.
 					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
-					bounds.setLow(0, _min_bounds[0]);
-					bounds.setHigh(0, _max_bounds[0]);
-					bounds.setLow(1,  _min_bounds[1]);
-					bounds.setHigh(1,  _max_bounds[1]);
-					bounds.setLow(2, 0);
-					bounds.setHigh(2, 3);
+					// bounds.setLow(0, _min_bounds[0]);
+					// bounds.setHigh(0, _max_bounds[0]);
+					// bounds.setLow(1,  _min_bounds[1]);
+					// bounds.setHigh(1,  _max_bounds[1]);
+					// bounds.setLow(2, 1.5);
+					// bounds.setHigh(2, 2.5);
+
+					bounds.setLow(0, -40);
+					bounds.setHigh(0, 40);
+					bounds.setLow(1,  -5);
+					bounds.setHigh(1,  5);
+					bounds.setLow(2, 1.0);
+					bounds.setHigh(2, 3.0);
 
 					space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -189,13 +325,13 @@ void DPlanning::run()
 					obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
 					pdef->setOptimizationObjective(obj);
 
-					ob::PlannerPtr plan(new og::RRTstar(si));
+					ob::PlannerPtr plan(new og::InformedRRTstar(si));
 					// set the problem we are trying to solve for the planner
 					plan->setProblemDefinition(pdef);
 					// perform setup steps for the planner
 					plan->setup();
 					// attempt to solve the problem within one second of planning time
-					ob::PlannerStatus solved = plan->solve(2);
+					ob::PlannerStatus solved = plan->solve(1);
 
 					if (solved)
 					{
@@ -274,38 +410,34 @@ void DPlanning::run()
 
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 3.0, 1.0);
+						segment_times = estimateSegmentTimes(vertices, 0.5, 0.5);
 						// set up optimization problem
-						const int N = 10;
+						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 						// constrain velocity and acceleration
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.5);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.5);
 
 						// solve trajectory
 						opt.optimize();
-						opt.getTrajectory(&trajectory);
+						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
 						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
 						// in EigenTrajectoryPoint struct
 						// TODO : having topic for this structure ~ Assign Phu HUYNH.
 
-						// Whole trajectory:
-						double sampling_interval = 0.05;
-						bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
-
 						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
 						ros_client->way_points_pub.publish(d_way_points);
-						ros_client->global_traj_pub.publish(global_trajectory);
-						pre_time = ros::Time::now();
-						this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
+						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						global_start_time = ros::Time::now().toSec();
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
 						break;
 					}
 					else
@@ -316,10 +448,11 @@ void DPlanning::run()
 				}
 				case PLANNING_STEP::ASTAR_PLANNING:
 				{
-					this->grid = new Grid3D(100,100,10,1);
-					octomap::point3d current_pos(d_local_position.pose.position.x,
-								d_local_position.pose.position.y,
-								d_local_position.pose.position.z);	
+					this->grid = new Grid3D(160,20,5,0.5);
+					ROS_INFO("GLOBAL ASTAR ACTIVE");
+					octomap::point3d current_pos(0,
+						0,
+						2);	
 					grid->Initilize(current_pos);
 					grid->readOctomapMsg(this->octomap_msgs);
 
@@ -328,9 +461,11 @@ void DPlanning::run()
 						endpoint_pos_ENU.pose.position.y,
 						endpoint_pos_ENU.pose.position.z),
 					this->grid);
+					ROS_INFO("GLOBAL ASTAR ACTIVE1");
 
-					std::vector<int> node_index;
-					bool solved = astar->find_path(current_pos, node_index,100000);
+					std::vector<octomap::point3d> node_index;
+					std::vector<octomap::point3d> path_smooth;
+					bool solved = astar->find_path(current_pos, node_index, path_smooth,100000);
 
 					if(solved){
 						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
@@ -343,9 +478,9 @@ void DPlanning::run()
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 						int marr_index = 0;
-						for(std::vector<int>::iterator it = node_index.begin(); it != node_index.end(); ++it){
+						for(std::vector<octomap::point3d>::iterator it = node_index.begin(); it != node_index.end(); ++it){
 
-							octomap::point3d pos = grid->toPosition(*it);
+							octomap::point3d pos = *it;
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
@@ -357,9 +492,9 @@ void DPlanning::run()
 							mk.pose.position.z = pos.z();
 							mk.color.r = 1.0;
 							mk.color.a = 1.0;
-							mk.scale.x = 0.2;
-							mk.scale.y = 0.2;
-							mk.scale.z = 0.2;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
 							this->d_way_points.markers.push_back(mk);
 
 							if(it == node_index.begin()){
@@ -382,9 +517,9 @@ void DPlanning::run()
 						}
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 3.0, 1.0);
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
 						// set up optimization problem
-						const int N = 10;
+						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
@@ -394,7 +529,7 @@ void DPlanning::run()
 
 						// solve trajectory
 						opt.optimize();
-						opt.getTrajectory(&trajectory);
+						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
 						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
@@ -402,18 +537,18 @@ void DPlanning::run()
 						// TODO : having topic for this structure ~ Assign Phu HUYNH.
 
 						// Whole trajectory:
-						double sampling_interval = 0.05;
-						bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_interval, &states);
+						// double sampling_interval = 0.05;
+						// bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
 
 						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &global_trajectory);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
 						ros_client->way_points_pub.publish(d_way_points);
-						ros_client->global_traj_pub.publish(global_trajectory);
-						pre_time = ros::Time::now();
-						this->planning_type = PLANNING_STEP::FOLLOW_TRAJECTORY;
+						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						global_start_time = ros::Time::now().toSec();
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
 						break;				
 					}
 					else{
@@ -421,11 +556,11 @@ void DPlanning::run()
 					}
 					break;
 				}
-				case PLANNING_STEP::FOLLOW_TRAJECTORY:
+				case PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY:
 				{
-					double dt = ros::Time::now().toSec() - pre_time.toSec();
-					int derivative_order = mav_trajectory_generation::derivative_order::POSITION;
-					if (dt > trajectory.getMaxTime())
+					dt_global = ros::Time::now().toSec() - global_start_time;
+					double d_future = dt_global;
+					if (dt_global > global_trajectory.getMaxTime())
 					{
 						endpoint_active = false;
 						ROS_INFO("Finished.");
@@ -433,9 +568,9 @@ void DPlanning::run()
 						break;
 					}
 
-					Eigen::VectorXd position_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
-					Eigen::VectorXd vel_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
-					Eigen::VectorXd acce_d = trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+					Eigen::VectorXd position_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd vel_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd acce_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::ACCELERATION);
 
 					//PositionTarget Message Format.
 
@@ -452,13 +587,670 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
 
+					trajectory_subset.poses.clear();
+					//5s ahead
+					for(int i = 0; i < 80; i++){
+						d_future += 0.1;
+						if(d_future > global_trajectory.getMaxTime()){
+							break;
+						}
+						Eigen::VectorXd position_future = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+
+						geometry_msgs::Pose future_pose;
+						future_pose.position.x = position_future(0);
+						future_pose.position.y = position_future(1);
+						future_pose.position.z = position_future(2);
+
+						trajectory_subset.poses.push_back(future_pose);
+					}
+					ros_client->traj_subset_pub.publish(trajectory_subset);
+
+
+					geometry_msgs::PoseStamped target_pose;
+					if(dt_global + local_ahead_time > global_trajectory.getMaxTime()){
+						Eigen::VectorXd position_future = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, 
+						mav_trajectory_generation::derivative_order::POSITION);
+						target_pose.pose.position.x = position_future(0);
+						target_pose.pose.position.y = position_future(1);
+						target_pose.pose.position.z = position_future(2);
+					}
+					else{
+						Eigen::VectorXd position_future = global_trajectory.evaluate(dt_global + local_ahead_time, 
+						mav_trajectory_generation::derivative_order::POSITION);
+						target_pose.pose.position.x = position_future(0);
+						target_pose.pose.position.y = position_future(1);
+						target_pose.pose.position.z = position_future(2);
+					}
+					ros_client->local_target_pub.publish(target_pose);
 					// publishVisualize();
 					ros_client->publish_raw_position_target(setpoint_raw);
 					break;
 				}
+				case PLANNING_STEP::FOLLOW_LOCAL_TRAJECTORY:
+				{
+					double dt = ros::Time::now().toSec() - local_start_time;
+					double d_future = dt;
+					double delta_t = dt - pre_time;
+					pre_time = dt;
+
+					if (dt > local_trajectory.getMaxTime())
+					{
+						global_start_time = ros::Time::now().toSec() - dt_global;
+						ROS_INFO("BACK TO GLOBAL TRAJECTORY");
+						this->planning_type = PLANNING_STEP::FOLLOW_GLOBAl_TRAJECTORY;
+						break;
+					}
+
+					Eigen::VectorXd position_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::POSITION);
+					Eigen::VectorXd vel_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::VELOCITY);
+					Eigen::VectorXd acce_d = local_trajectory.evaluate(dt, mav_trajectory_generation::derivative_order::ACCELERATION);
+
+					//PositionTarget Message Format.
+
+					setpoint_raw.header.stamp = ros::Time::now();
+					setpoint_raw.header.frame_id = "map";
+					setpoint_raw.type_mask = 0;
+					setpoint_raw.position.x = position_d(0);
+					setpoint_raw.position.y = position_d(1);
+					setpoint_raw.position.z = position_d(2);
+					setpoint_raw.velocity.x = vel_d(0);
+					setpoint_raw.velocity.y = vel_d(1);
+					setpoint_raw.velocity.z = vel_d(2);
+					setpoint_raw.acceleration_or_force.x = acce_d(0);
+					setpoint_raw.acceleration_or_force.y = acce_d(1);
+					setpoint_raw.acceleration_or_force.z = acce_d(2);
+
+					trajectory_subset.poses.clear();
+					for(int i = 0; i < 80; i++){
+						d_future += 0.1;
+						Eigen::VectorXd position_future;
+						if(d_future > local_trajectory.getMaxTime()){
+							if(dt_global + i > global_trajectory.getMaxTime()){
+								break;
+							}
+							else{
+								position_future = global_trajectory.evaluate(dt_global+i, mav_trajectory_generation::derivative_order::POSITION);
+							}
+						}
+						else{
+							position_future = local_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
+						}
+						geometry_msgs::Pose future_pose;
+						future_pose.position.x = position_future(0);
+						future_pose.position.y = position_future(1);
+						future_pose.position.z = position_future(2);
+
+						trajectory_subset.poses.push_back(future_pose);
+					}
+
+					ros_client->traj_subset_pub.publish(trajectory_subset);
+
+					// publishVisualize();
+					geometry_msgs::PoseStamped target_pose;
+					if(dt_global + local_ahead_time > global_trajectory.getMaxTime()){
+						Eigen::VectorXd position_future = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, 
+						mav_trajectory_generation::derivative_order::POSITION);
+						target_pose.pose.position.x = position_future(0);
+						target_pose.pose.position.y = position_future(1);
+						target_pose.pose.position.z = position_future(2);
+					}
+					else{
+						Eigen::VectorXd position_future = global_trajectory.evaluate(dt_global + local_ahead_time, 
+						mav_trajectory_generation::derivative_order::POSITION);
+						target_pose.pose.position.x = position_future(0);
+						target_pose.pose.position.y = position_future(1);
+						target_pose.pose.position.z = position_future(2);
+					}
+					ros_client->local_target_pub.publish(target_pose);
+
+					ros_client->publish_raw_position_target(setpoint_raw);
+					break;
+				}
+				case PLANNING_STEP::VISUALIZATION_GLOBAL: {
+					this->grid = new Grid3D(160,20,5,0.5);
+					ROS_INFO("GLOBAL ASTAR ACTIVE");
+					octomap::point3d current_pos(0,
+						0,
+						2);	
+					grid->Initilize(current_pos);
+					grid->readOctomapMsg(this->octomap_msgs);
+
+					astar = new Astar(
+					octomap::point3d(endpoint_pos_ENU.pose.position.x,
+						endpoint_pos_ENU.pose.position.y,
+						endpoint_pos_ENU.pose.position.z),
+					this->grid);
+					ROS_INFO("GLOBAL ASTAR ACTIVE1");
+
+					std::vector<octomap::point3d> node_index;
+					std::vector<octomap::point3d> path_smooth;
+					bool solved = astar->find_path(current_pos, node_index, path_smooth,100000);
+
+					if(path_smooth.size() < 3){
+							break;	
+					}
+
+					//VISUALIZATION FOR ATSAR
+					if(solved){
+						mav_trajectory_generation::Trajectory global_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						int marr_index = 0;
+						this->global_waypoints_markerarray1.markers.clear();
+						for(std::vector<octomap::point3d>::iterator it = node_index.begin(); it != node_index.end(); ++it){
+
+							octomap::point3d pos = *it;
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos.x();
+							mk.pose.position.y = pos.y();
+							mk.pose.position.z = pos.z();
+							mk.color.r = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							this->global_waypoints_markerarray1.markers.push_back(mk);
+
+							if(it == node_index.begin()){
+								start.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d::Zero());
+								vertices.push_back(start);
+							}
+							else if(std::next(it) == node_index.end()){
+								end.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(0, 0, 0));
+								vertices.push_back(end);
+							}
+							else{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos.x(), pos.y(), pos.z()));
+								vertices.push_back(vertex);
+							}
+						}
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
+
+						// solve trajectory
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR ASTAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());  
+						opt.getTrajectory(&global_trajectory1);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory1, distance, frame_id, &global_trajectory_markerarray1);
+						ros_client->global_waypoints_pub1.publish(global_waypoints_markerarray1);
+						ros_client->global_trajectory_pub1.publish(global_trajectory_markerarray1);
+						global_start_time = ros::Time::now().toSec();
+					}
+
+					//VISUALIZATION FOR ASTAR SMOOTH
+					if(solved){
+						mav_trajectory_generation::Trajectory global_trajectory2;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						int marr_index = 0;
+						this->global_waypoints_markerarray2.markers.clear();
+						for(std::vector<octomap::point3d>::iterator it = path_smooth.begin(); it != path_smooth.end(); ++it){
+
+							octomap::point3d pos = *it;
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos.x();
+							mk.pose.position.y = pos.y();
+							mk.pose.position.z = pos.z();
+							mk.color.r = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							this->global_waypoints_markerarray2.markers.push_back(mk);
+
+							if(it == node_index.begin()){
+								start.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d::Zero());
+								vertices.push_back(start);
+							}
+							else if(std::next(it) == node_index.end()){
+								end.makeStartOrEnd(Eigen::Vector3d(pos.x(), pos.y(), pos.z()), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(0, 0, 0));
+								vertices.push_back(end);
+							}
+							else{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos.x(), pos.y(), pos.z()));
+								vertices.push_back(vertex);
+							}
+						}
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 1.0);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 1.0);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR ASTAR SMOOTH TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&global_trajectory2);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						// Whole trajectory:
+						double sampling_interval = 0.05;
+						bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory2, sampling_interval, &states);
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory2, distance, frame_id, &global_trajectory_markerarray2);
+						ros_client->global_waypoints_pub2.publish(global_waypoints_markerarray2);
+						ros_client->global_trajectory_pub2.publish(global_trajectory_markerarray2);
+						global_start_time = ros::Time::now().toSec();
+	
+					}
+
+					ompl::base::StateSpacePtr space;
+					ompl::base::SpaceInformationPtr si;
+	
+					space = ob::StateSpacePtr(new ob::SE3StateSpace());
+
+					// create a start state
+					ob::ScopedState<ob::SE3StateSpace> start(space);
+					// create a goal state
+					ob::ScopedState<ob::SE3StateSpace> goal(space);
+					// set the bounds for the R^3 part of SE(3)
+					ob::RealVectorBounds bounds(3);
+
+					//TODO : Assign Khang VO.
+					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
+					// bounds.setLow(0, _min_bounds[0]);
+					// bounds.setHigh(0, _max_bounds[0]);
+					// bounds.setLow(1,  _min_bounds[1]);
+					// bounds.setHigh(1,  _max_bounds[1]);
+					// bounds.setLow(2, 1.5);
+					// bounds.setHigh(2, 2.5);
+
+					bounds.setLow(0, -40);
+					bounds.setHigh(0, 40);
+					bounds.setLow(1,  -5);
+					bounds.setHigh(1,  5);
+					bounds.setLow(2, 1.0);
+					bounds.setHigh(2, 3.0);
+
+					space->as<ob::SE3StateSpace>()->setBounds(bounds);
+
+					// construct an instance of  space information from this state space
+					si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
+					start->setXYZ(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);
+					start->as<ob::SO3StateSpace::StateType>(1)->setIdentity(); // start.random();
+					goal->setXYZ(endpoint_pos_ENU.pose.position.x,
+						endpoint_pos_ENU.pose.position.y,
+						endpoint_pos_ENU.pose.position.z);
+					goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+					// goal.random();
+
+					// set state validity checking for this space
+					std::shared_ptr<OctomapStateValidator> validity_checker(new OctomapStateValidator(si, this->octomap_msgs));
+					si->setStateValidityChecker(validity_checker);
+
+					// create a problem instance
+					ompl::base::ProblemDefinitionPtr pdef1 = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
+					// set the start and goal states
+					pdef1->setStartAndGoalStates(start, goal);
+					// set Optimizattion objective
+					ob::OptimizationObjectivePtr obj1(new ob::PathLengthOptimizationObjective(si));
+					obj1->setCostToGoHeuristic(&ob::goalRegionCostToGo);
+					pdef1->setOptimizationObjective(obj1);
+
+					// create a problem instance
+					ompl::base::ProblemDefinitionPtr pdef2 = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(si));
+					// set the start and goal states
+					pdef2->setStartAndGoalStates(start, goal);
+					// set Optimizattion objective
+					ob::OptimizationObjectivePtr obj2(new ob::PathLengthOptimizationObjective(si));
+					obj2->setCostToGoHeuristic(&ob::goalRegionCostToGo);
+					pdef2->setOptimizationObjective(obj2);
+
+					ob::PlannerPtr plan1(new og::RRTstar(si));
+					// set the problem we are trying to solve for the planner
+					plan1->setProblemDefinition(pdef1);
+					// perform setup steps for the planner
+					plan1->setup();
+					// attempt to solve the problem within one second of planning time
+
+					auto time_start1 = std::chrono::high_resolution_clock::now(); 
+					ob::PlannerStatus solved1 = plan1->solve(0.05);
+					auto time_end1 = std::chrono::high_resolution_clock::now();
+      				auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end1 - time_start1);
+					ROS_INFO("TIME FOR RRT SOLVE: %d", duration1);
+
+					ob::PlannerPtr plan2(new og::InformedRRTstar(si));
+					// set the problem we are trying to solve for the planner
+					plan2->setProblemDefinition(pdef2);
+					// perform setup steps for the planner
+					plan2->setup();
+					// attempt to solve the problem within one second of planning time
+					auto time_start2 = std::chrono::high_resolution_clock::now(); 
+					ob::PlannerStatus solved2 = plan2->solve(0.05);
+					auto time_end2 = std::chrono::high_resolution_clock::now();
+      				auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end2 - time_start2);
+					ROS_INFO("TIME FOR INFORMED RRT SOLVE: %d, COST: %f", duration2);
+  
+
+					if (solved1)
+					{
+						int marr_index = 0;
+						this->global_waypoints_markerarray3.markers.clear();	
+						// Path smoothing using bspline
+						// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+						// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+						// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+
+						// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+						// // Using 5, as is the default value of the function
+						// // If the path is not smooth, the value of smoothness() will be closer to 1
+						// int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+						// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+						// ROS_INFO("Smoothed Path\n");
+						// _path_smooth->print(std::cout);
+						mav_trajectory_generation::Trajectory global_trajectory3;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						og::PathGeometric *path = pdef1->getSolutionPath()->as<og::PathGeometric>();
+						ROS_INFO("RRT STAR SOLUTION STATE: %d", path->getStateCount());
+						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
+						{
+							const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+
+							// extract the first component of the state and cast it to what we expect
+							const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+							// extract the second component of the state and cast it to what we expect
+							const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos->values[0];
+							mk.pose.position.y = pos->values[1];
+							mk.pose.position.z = pos->values[2];
+							mk.color.r = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							this->global_waypoints_markerarray3.markers.push_back(mk);
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d::Zero());
+								vertices.push_back(start);
+							}
+							else if (path_idx == path->getStateCount() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(0, 0, 0));
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR RRT STAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&global_trajectory3);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory3, distance, frame_id, &global_trajectory_markerarray3);
+						ros_client->global_waypoints_pub3.publish(global_waypoints_markerarray3);
+						ros_client->global_trajectory_pub3.publish(global_trajectory_markerarray3);
+						global_start_time = ros::Time::now().toSec();
+					}
+					else
+					{
+						ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
+						break;
+					}
+
+					if (solved2)
+					{
+						int marr_index = 0;
+						this->global_waypoints_markerarray4.markers.clear();	
+						// Path smoothing using bspline
+						// ompl::geometric::PathSimplifier *pathBSpline = new ompl::geometric::PathSimplifier(si);
+						// ompl::geometric::PathGeometric *_path_smooth = new ompl::geometric::PathGeometric(
+						// 	dynamic_cast<const ompl::geometric::PathGeometric &>(*pdef->getSolutionPath()));
+
+						// ROS_WARN("Path smoothness : %f\n", _path_smooth->smoothness());
+						// // Using 5, as is the default value of the function
+						// // If the path is not smooth, the value of smoothness() will be closer to 1
+						// int bspline_steps = ceil(3 * _path_smooth->smoothness());
+
+						// pathBSpline->smoothBSpline(*_path_smooth, bspline_steps);
+						// ROS_INFO("Smoothed Path\n");
+						// _path_smooth->print(std::cout);
+						mav_trajectory_generation::Trajectory global_trajectory4;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						og::PathGeometric *path = pdef2->getSolutionPath()->as<og::PathGeometric>();
+
+						ROS_INFO("RRT INFORMED STAR SOLUTION STATE: %d", path->getStateCount());
+						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
+						{
+							const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
+
+							// extract the first component of the state and cast it to what we expect
+							const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+							// extract the second component of the state and cast it to what we expect
+							const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.CUBE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos->values[0];
+							mk.pose.position.y = pos->values[1];
+							mk.pose.position.z = pos->values[2];
+							mk.color.r = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							this->global_waypoints_markerarray4.markers.push_back(mk);
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d::Zero());
+								vertices.push_back(start);
+							}
+							else if (path_idx == path->getStateCount() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(0, 0, 0));
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(pos->values[0], pos->values[1], pos->values[2]));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR INFORMRED RRT STAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&global_trajectory4);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory4, distance, frame_id, &global_trajectory_markerarray4);
+						ros_client->global_waypoints_pub4.publish(global_waypoints_markerarray4);
+						ros_client->global_trajectory_pub4.publish(global_trajectory_markerarray4);
+						global_start_time = ros::Time::now().toSec();
+					}
+					else
+					{
+						ROS_INFO("FAILED TO FIND PATH WITH OMPL-RRT");
+						break;
+
+					}	
+					this->planning_type = PLANNING_STEP::IDLE;
+			
+					break;
+				}
 				case PLANNING_STEP::IDLE:
 				{
-					ROS_INFO("Target reach. Waiting for command");
+					// ROS_INFO("Target reach. Waiting for command");
+					ros_client->global_waypoints_pub1.publish(global_waypoints_markerarray1);
+					ros_client->global_trajectory_pub1.publish(global_trajectory_markerarray1);
+					ros_client->global_waypoints_pub2.publish(global_waypoints_markerarray2);
+					ros_client->global_trajectory_pub2.publish(global_trajectory_markerarray2);
+					ros_client->global_waypoints_pub3.publish(global_waypoints_markerarray3);
+					ros_client->global_trajectory_pub3.publish(global_trajectory_markerarray3);
+					ros_client->global_waypoints_pub4.publish(global_waypoints_markerarray4);
+					ros_client->global_trajectory_pub4.publish(global_trajectory_markerarray4);
+
+					ros_client->local_trajectory_pub1.publish(local_trajectory_markerarray1);
+					ros_client->local_trajectory_pub2.publish(local_trajectory_markerarray2);
+					ros_client->local_trajectory_pub3.publish(local_trajectory_markerarray3);
+					ros_client->local_trajectory_pub4.publish(local_trajectory_markerarray4);
+					break;
+				}
+				case PLANNING_STEP::APF:
+				{
 					break;
 				}
 			}
@@ -516,8 +1308,8 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
 			endpoint_pos_ENU.pose.position.x, endpoint_pos_ENU.pose.position.y, endpoint_pos_ENU.pose.position.z);
 
-		start_time = ros::Time::now();
-		pre_time = ros::Time::now();
+		start_time = ros::Time::now().toSec();
+		pre_time = ros::Time::now().toSec();
 		startpoint_pos_ENU = d_local_position;
 		d_previous_position = d_local_position;
 		travel_cost = 0.0;
@@ -561,30 +1353,28 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 
 //local map callback
 //TODO : Khang VO
-void DPlanning::occ_trigger_callback(const std_msgs::Bool::ConstPtr &msg){
-
+void DPlanning::occ_trigger_callback(const std_msgs::BoolConstPtr &msg){
+	if(msg->data){
+		planning_type = PLANNING_STEP::LOCAL_PLANNING;
+		std_msgs::Bool local_planning;
+		local_planning.data = true;
+		ros_client->local_astar_active_pub.publish(local_planning);
+	}
 }
-void DPlanning::apf_force_callback(const geometry_msgs::PoseStamped::ConstPtr &msg){
 
+void DPlanning::apf_force_callback(const geometry_msgs::PoseStampedConstPtr &msg){
+	apf_vel = *msg;
 }
-	
 
+void DPlanning::local_waypoint_callback(const geometry_msgs::PoseArrayConstPtr &msg){
+	local_waypoints = *msg;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void DPlanning::global_trigger_callback(const std_msgs::BoolConstPtr& msg){
+	if(msg->data){
+		planning_type = PLANNING_STEP::GLOBAL_PLANNING;
+	}
+}
 
 
 //
@@ -647,4 +1437,296 @@ bool DPlanning::isStateValid(const ompl::base::State *state)
 	//
 	// return(!collisionResult.isCollision());
 	return true;
+}
+
+void DPlanning::local_waypoint_callback1(const geometry_msgs::PoseArrayConstPtr &msg){
+	if(local_trajectory_markerarray1.markers.size() == 0){
+		mav_trajectory_generation::Trajectory local_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						for (std::size_t path_idx = 0; path_idx < msg->poses.size(); path_idx++)
+						{
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(start);
+							}
+							else if (path_idx == msg->poses.size() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR ASTAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&local_trajectory1);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray1);
+	}
+}
+
+void DPlanning::local_waypoint_callback2(const geometry_msgs::PoseArrayConstPtr &msg){
+	if(local_trajectory_markerarray2.markers.size() == 0){
+		mav_trajectory_generation::Trajectory local_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						for (std::size_t path_idx = 0; path_idx < msg->poses.size(); path_idx++)
+						{
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(start);
+							}
+							else if (path_idx == msg->poses.size() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR ASTAR SMOOTH TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&local_trajectory1);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray2);
+	}
+}
+
+void DPlanning::local_waypoint_callback3(const geometry_msgs::PoseArrayConstPtr &msg){
+	if(local_trajectory_markerarray3.markers.size() == 0){
+		mav_trajectory_generation::Trajectory local_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						for (std::size_t path_idx = 0; path_idx < msg->poses.size(); path_idx++)
+						{
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(start);
+							}
+							else if (path_idx == msg->poses.size() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR RRT STAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&local_trajectory1);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray3);
+	}
+}
+
+void DPlanning::local_waypoint_callback4(const geometry_msgs::PoseArrayConstPtr &msg){
+	if(local_trajectory_markerarray4.markers.size() == 0){
+		mav_trajectory_generation::Trajectory local_trajectory1;
+						mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+						mav_trajectory_generation ::Vertex::Vector vertices;
+						const int dimension = 3;
+						const int derivative_to_optimize = mav_trajectory_generation::derivative_order::ACCELERATION;
+						// we have 2 vertices:
+						// Start = current position
+						// end = desired position and velocity
+						mav_trajectory_generation::Vertex start(dimension), end(dimension);
+
+						for (std::size_t path_idx = 0; path_idx < msg->poses.size(); path_idx++)
+						{
+
+							if (path_idx == 0)
+							{
+								start.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(start);
+							}
+							else if (path_idx == msg->poses.size() - 1)
+							{
+								end.makeStartOrEnd(Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z), derivative_to_optimize);
+								// set start point's velocity to be constrained to current velocity
+								vertices.push_back(end);
+							}
+							else
+							{
+								mav_trajectory_generation::Vertex vertex(dimension);
+								vertex.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(msg->poses[path_idx].position.x, 
+								msg->poses[path_idx].position.y, 
+								msg->poses[path_idx].position.z));
+								vertices.push_back(vertex);
+							}
+						}
+
+						// setimate initial segment times
+						std::vector<double> segment_times;
+						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						// set up optimization problem
+						const int N = 6;
+						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+						// constrain velocity and acceleration
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+
+						auto time_start = std::chrono::high_resolution_clock::now();                      
+						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR INFORMED RRT STAR TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+						opt.getTrajectory(&local_trajectory1);
+
+						// use it for controller.
+						// ref : https://github.com/ethz-asl/mav_comm/blob/master/mav_msgs/include/mav_msgs/eigen_mav_msgs.h
+						// in EigenTrajectoryPoint struct
+						// TODO : having topic for this structure ~ Assign Phu HUYNH.
+
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						std::string frame_id = "map";
+
+						// From Trajectory class:
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray4);
+	}
 }
