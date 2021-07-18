@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+        <node pkg="tf" type="static_transform_publisher" name="drone"
+          args="0 0 0 0 0 0  drone camera_link 100"/>
+         <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+                <param name="resolution" value="0.3" />
+
+                <!-- fixed map frame (set to 'map' if SLAM or localization running!) -->
+		<param name="frame_id" type="string" value="/map" />
+
+                <!-- maximum range to integrate (speedup!) -->
+                <param name="sensor_model/max_range" value="10" />
+
+                <!-- data source to integrate (PointCloud2) -->
+                <!-- <remap from="cloud_in" to="/cloud_in" /camera/depth/color/points /> -->
+                <remap from="cloud_in" to="/camera/depth_registered/points" />
+
+        </node>
+</launch>

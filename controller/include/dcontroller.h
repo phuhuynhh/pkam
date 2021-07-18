@@ -120,6 +120,7 @@ public:
 
 	// void flyToGlobal(double latitude, double longitude, double altitude, double yaw);
 	void flyToLocal(double x, double y, double z);
+	void flyToLocal();
 	// void flyToLocalNoCollision(double x, double y, double z);
 
 

@@ -80,7 +80,7 @@ void DPlanning::run()
 						ROS_INFO("Best exec time : %d", best_duration);
 						ROS_INFO("Worst exec time : %d", worst_duration);
 						endpoint_active = false;
-						ROS_INFO("Finished.");
+						// ROS_INFO("Finished.");
 						this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
 						break;
 					}
