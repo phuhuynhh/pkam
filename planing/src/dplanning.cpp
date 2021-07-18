@@ -81,10 +81,11 @@ void DPlanning::run()
 						ROS_INFO("Best exec time : %d", best_duration);
 						ROS_INFO("Worst exec time : %d", worst_duration);
 						endpoint_active = false;
-						ROS_INFO("Finished.");
+						// ROS_INFO("Finished.");
 						this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
 						break;
 					}
+					
 						geometry_msgs::Point start, end;
 						start.x = d_local_position.pose.position.x;
 						start.y = d_local_position.pose.position.y;
@@ -107,10 +108,11 @@ void DPlanning::run()
 						setpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + vy;
 						setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + vz;
 
-						publishVisualize();
+						// publishVisualize();
+						
 
 					//Force take-off.
-					ros_client->publish_position_to_controller(endpoint_pos_ENU);
+					ros_client->publish_position_to_controller(setpoint_pos_ENU);
 
 					break;
 				}

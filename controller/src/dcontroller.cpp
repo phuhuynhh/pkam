@@ -71,6 +71,16 @@ void DController::flyToLocal(double x, double y, double z){
 	endpoint_pos_ENU.pose.position.z = z;
 	endpoint_pos_ENU.pose.orientation = tf::createQuaternionMsgFromYaw(currentYaw());
 
+	
+	ros_client->endpoint_pos_pub.publish(endpoint_pos_ENU);
+}
+
+void DController::flyToLocal(){
+	endpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x;
+	endpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + 5.0;
+	endpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z;
+	endpoint_pos_ENU.pose.orientation = tf::createQuaternionMsgFromYaw(currentYaw());
+
 
 	// ros_client->publishTrajectoryEndpoint(endpoint_pos_ENU);
 	ros_client->endpoint_pos_pub.publish(endpoint_pos_ENU);
@@ -111,12 +121,17 @@ void DController::offboardMode()
 
 void DController::takeOff()
 {
+<<<<<<< HEAD
   // ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,d_local_position.pose.position.y, d_local_position.pose.position.z);
+=======
+   ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
+>>>>>>> 827510214de4f83417635c3451e7601df7c15215
 
   // Take off
 	endpoint_pos_ENU = d_local_position;
-	endpoint_pos_ENU.pose.position.z = TAKEOFF_ALTITUDE;
+	endpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + TAKEOFF_ALTITUDE;
 	ros_client->endpoint_pos_pub.publish(endpoint_pos_ENU);
+	setpoint_pos_ENU = endpoint_pos_ENU;
 	mission_state = MISSION_STATE::TAKE_OFF;
 
 	return;
@@ -165,16 +180,30 @@ void DController::land()
 
 
 void DController::public_local_position(){
+<<<<<<< HEAD
 	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,
 		d_local_position.pose.position.y, d_local_position.pose.position.z);
 	ROS_INFO("Set position: E: %f, N: %f, U: %f", setpoint_pos_ENU.pose.position.x,
 		setpoint_pos_ENU.pose.position.y, setpoint_pos_ENU.pose.position.z);
 
+=======
+	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, 
+		d_local_position.pose.position.y, d_local_position.pose.position.z);
+
+	ROS_INFO("set local position: E: %f, N: %f, U: %f", setpoint_pos_ENU.pose.position.x, 
+		setpoint_pos_ENU.pose.position.y, setpoint_pos_ENU.pose.position.z);
+>>>>>>> 827510214de4f83417635c3451e7601df7c15215
 
 	ros_client->setpoint_pos_local_pub.publish(setpoint_pos_ENU);
 }
 
 void DController::public_raw_target(){
+	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, 
+		d_local_position.pose.position.y, d_local_position.pose.position.z);
+
+	ROS_INFO("set raw position: E: %f, N: %f, U: %f", setpoint_raw_target.position.x, 
+		setpoint_raw_target.position.y, setpoint_raw_target.position.z);
+
 	ros_client->setpoint_raw_pub.publish(setpoint_raw_target);
 }
 
