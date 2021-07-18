@@ -65,10 +65,10 @@ bool DController::is_mission_finished(){
 
 }
 
-void DController::flyToLocal(double x, double y, double z){
-	endpoint_pos_ENU.pose.position.x = x;
-	endpoint_pos_ENU.pose.position.y = y;
-	endpoint_pos_ENU.pose.position.z = z;
+void DController::flyToLocal(){
+	endpoint_pos_ENU.pose.position.x = d_local_position.pose.position.x;
+	endpoint_pos_ENU.pose.position.y = d_local_position.pose.position.y + 5.0;
+	endpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z;
 	endpoint_pos_ENU.pose.orientation = tf::createQuaternionMsgFromYaw(currentYaw());
 
 
@@ -111,13 +111,13 @@ void DController::offboardMode()
 
 void DController::takeOff()
 {
-  // ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,
-  //   d_local_position.pose.position.y, d_local_position.pose.position.z);
+   ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z);
 
   // Take off
 	endpoint_pos_ENU = d_local_position;
-	endpoint_pos_ENU.pose.position.z = TAKEOFF_ALTITUDE;
+	endpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + TAKEOFF_ALTITUDE;
 	ros_client->endpoint_pos_pub.publish(endpoint_pos_ENU);
+	setpoint_pos_ENU = endpoint_pos_ENU;
 	mission_state = MISSION_STATE::TAKE_OFF;
 
 	return;
@@ -166,10 +166,22 @@ void DController::land()
 
 
 void DController::public_local_position(){
+	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, 
+		d_local_position.pose.position.y, d_local_position.pose.position.z);
+
+	ROS_INFO("set local position: E: %f, N: %f, U: %f", setpoint_pos_ENU.pose.position.x, 
+		setpoint_pos_ENU.pose.position.y, setpoint_pos_ENU.pose.position.z);
+
 	ros_client->setpoint_pos_local_pub.publish(setpoint_pos_ENU);
 }
 
 void DController::public_raw_target(){
+	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x, 
+		d_local_position.pose.position.y, d_local_position.pose.position.z);
+
+	ROS_INFO("set raw position: E: %f, N: %f, U: %f", setpoint_raw_target.position.x, 
+		setpoint_raw_target.position.y, setpoint_raw_target.position.z);
+
 	ros_client->setpoint_raw_pub.publish(setpoint_raw_target);
 }
 
