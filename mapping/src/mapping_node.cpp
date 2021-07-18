@@ -37,8 +37,8 @@ ros::Time _last_time;
 
 //LocalMap
 bool initialized = false;
-const double resolution = 0.2;
-static const int POW = 5;
+const double resolution = 0.4;
+static const int POW = 4;
 static const int N = (1 << POW);
 ewok::EuclideanDistanceRingBuffer<POW> rrb(resolution, 1.0);
 

@@ -85,7 +85,6 @@ void DPlanning::run()
 						this->planning_type = PLANNING_STEP::GLOBAL_PLANNING;
 						break;
 					}
-					/*
 						geometry_msgs::Point start, end;
 						start.x = d_local_position.pose.position.x;
 						start.y = d_local_position.pose.position.y;
@@ -109,7 +108,6 @@ void DPlanning::run()
 						setpoint_pos_ENU.pose.position.z = d_local_position.pose.position.z + vz;
 
 						publishVisualize();
-						*/
 
 					//Force take-off.
 					ros_client->publish_position_to_controller(endpoint_pos_ENU);

@@ -111,8 +111,7 @@ void DController::offboardMode()
 
 void DController::takeOff()
 {
-  // ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,
-  //   d_local_position.pose.position.y, d_local_position.pose.position.z);
+  // ROS_INFO("Taking off. Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,d_local_position.pose.position.y, d_local_position.pose.position.z);
 
   // Take off
 	endpoint_pos_ENU = d_local_position;
@@ -166,6 +165,12 @@ void DController::land()
 
 
 void DController::public_local_position(){
+	ROS_INFO("Current position: E: %f, N: %f, U: %f", d_local_position.pose.position.x,
+		d_local_position.pose.position.y, d_local_position.pose.position.z);
+	ROS_INFO("Set position: E: %f, N: %f, U: %f", setpoint_pos_ENU.pose.position.x,
+		setpoint_pos_ENU.pose.position.y, setpoint_pos_ENU.pose.position.z);
+
+
 	ros_client->setpoint_pos_local_pub.publish(setpoint_pos_ENU);
 }
 
