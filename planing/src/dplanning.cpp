@@ -187,7 +187,7 @@ void DPlanning::run()
 
 							// visualization_msgs::Marker mk;
 							// mk.id = marr_index;
-							// mk.type = mk.CUBE;
+							// mk.type = mk.SPHERE;
 							// marr_index += 1;
 							// mk.header.frame_id = "map";
 							// mk.pose.position.x = pos->values[0];
@@ -254,7 +254,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// // From Trajectory class:
-						// mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
+						// mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray, false);
 						// ros_client->way_points_pub.publish(d_way_points);
 						// ros_client->global_traj_pub.publish(global_trajectory_markerarray);
 						local_start_time = ros::Time::now().toSec();
@@ -373,7 +373,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos->values[0];
@@ -381,9 +381,9 @@ void DPlanning::run()
 							mk.pose.position.z = pos->values[2];
 							mk.color.r = 1.0;
 							mk.color.a = 1.0;
-							mk.scale.x = 0.2;
-							mk.scale.y = 0.2;
-							mk.scale.z = 0.2;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
 							this->d_way_points.markers.push_back(mk);
 
 							if (path_idx == 0)
@@ -433,7 +433,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray, false);
 						ros_client->way_points_pub.publish(d_way_points);
 						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
 						global_start_time = ros::Time::now().toSec();
@@ -484,7 +484,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos.x();
@@ -544,7 +544,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray, false);
 						ros_client->way_points_pub.publish(d_way_points);
 						ros_client->global_traj_pub.publish(global_trajectory_markerarray);
 						global_start_time = ros::Time::now().toSec();
@@ -750,7 +750,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos.x();
@@ -810,7 +810,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory1, distance, frame_id, &global_trajectory_markerarray1);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory1, distance, frame_id, &global_trajectory_markerarray1, false);
 						ros_client->global_waypoints_pub1.publish(global_waypoints_markerarray1);
 						ros_client->global_trajectory_pub1.publish(global_trajectory_markerarray1);
 						global_start_time = ros::Time::now().toSec();
@@ -836,7 +836,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos.x();
@@ -899,7 +899,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory2, distance, frame_id, &global_trajectory_markerarray2);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory2, distance, frame_id, &global_trajectory_markerarray2, false);
 						ros_client->global_waypoints_pub2.publish(global_waypoints_markerarray2);
 						ros_client->global_trajectory_pub2.publish(global_trajectory_markerarray2);
 						global_start_time = ros::Time::now().toSec();
@@ -1037,7 +1037,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos->values[0];
@@ -1100,7 +1100,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory3, distance, frame_id, &global_trajectory_markerarray3);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory3, distance, frame_id, &global_trajectory_markerarray3, false);
 						ros_client->global_waypoints_pub3.publish(global_waypoints_markerarray3);
 						ros_client->global_trajectory_pub3.publish(global_trajectory_markerarray3);
 						global_start_time = ros::Time::now().toSec();
@@ -1153,7 +1153,7 @@ void DPlanning::run()
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos->values[0];
@@ -1216,7 +1216,7 @@ void DPlanning::run()
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(global_trajectory4, distance, frame_id, &global_trajectory_markerarray4);
+						mav_trajectory_generation::drawMavTrajectory(global_trajectory4, distance, frame_id, &global_trajectory_markerarray4, false);
 						ros_client->global_waypoints_pub4.publish(global_waypoints_markerarray4);
 						ros_client->global_trajectory_pub4.publish(global_trajectory_markerarray4);
 						global_start_time = ros::Time::now().toSec();
@@ -1508,7 +1508,7 @@ void DPlanning::local_waypoint_callback1(const geometry_msgs::PoseArrayConstPtr 
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray1);
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray1, true);
 	}
 }
 
@@ -1581,7 +1581,7 @@ void DPlanning::local_waypoint_callback2(const geometry_msgs::PoseArrayConstPtr 
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray2);
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray2, true);
 	}
 }
 
@@ -1654,7 +1654,7 @@ void DPlanning::local_waypoint_callback3(const geometry_msgs::PoseArrayConstPtr 
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray3);
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray3, true);
 	}
 }
 
@@ -1727,6 +1727,6 @@ void DPlanning::local_waypoint_callback4(const geometry_msgs::PoseArrayConstPtr 
 						std::string frame_id = "map";
 
 						// From Trajectory class:
-						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray4);
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory1, distance, frame_id, &local_trajectory_markerarray4, true);
 	}
 }

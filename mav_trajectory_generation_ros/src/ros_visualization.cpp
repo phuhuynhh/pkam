@@ -64,11 +64,11 @@ static constexpr double kDefaultSamplingTime = 0.1;
 
 void drawMavTrajectory(const Trajectory& trajectory, double distance,
                        const std::string& frame_id,
-                       visualization_msgs::MarkerArray* marker_array) {
+                       visualization_msgs::MarkerArray* marker_array, bool isLocal) {
   // This is just an empty extra marker that doesn't draw anything.
   mav_visualization::MarkerGroup dummy_marker;
   return drawMavTrajectoryWithMavMarker(trajectory, distance, frame_id,
-                                        dummy_marker, marker_array);
+                                        dummy_marker, marker_array, isLocal);
 }
 
 void drawMavSampledTrajectorybyTime(
@@ -111,7 +111,8 @@ void drawMavSampledTrajectory(
 void drawMavTrajectoryWithMavMarker(
     const Trajectory& trajectory, double distance, const std::string& frame_id,
     const mav_visualization::MarkerGroup& additional_marker,
-    visualization_msgs::MarkerArray* marker_array) {
+    visualization_msgs::MarkerArray* marker_array,
+    bool isLocal) {
   // Sample the trajectory.
   mav_msgs::EigenTrajectoryPoint::Vector trajectory_points;
 
@@ -122,21 +123,27 @@ void drawMavTrajectoryWithMavMarker(
   }
   // Draw the trajectory.
   drawMavSampledTrajectoryWithMavMarker(trajectory_points, distance, frame_id,
-                                        additional_marker, marker_array);
+                                        additional_marker, marker_array, isLocal);
 }
 
 void drawMavSampledTrajectoryWithMavMarker(
     const mav_msgs::EigenTrajectoryPoint::Vector& trajectory_points, double distance,
     const std::string& frame_id,
     const mav_visualization::MarkerGroup& additional_marker,
-    visualization_msgs::MarkerArray* marker_array) {
+    visualization_msgs::MarkerArray* marker_array, 
+    bool isLocal) {
   CHECK_NOTNULL(marker_array);
   marker_array->markers.clear();
 
   visualization_msgs::Marker line_strip;
   line_strip.type = visualization_msgs::Marker::LINE_STRIP;
-  line_strip.color = mav_visualization::Color::Orange();
-  line_strip.scale.x = 0.01;
+  if(isLocal){
+    line_strip.color = mav_visualization::Color::Green();
+  }
+  else{
+    line_strip.color = mav_visualization::Color::Orange();
+  }
+  line_strip.scale.x = 0.08;
   line_strip.ns = "path";
 
   double accumulated_distance = 0.0;
@@ -155,7 +162,7 @@ void drawMavSampledTrajectoryWithMavMarker(
       mav_visualization::drawAxesArrows(mav_state.position_W,
                                         mav_state.orientation_W_B, 0.3, 0.3,
                                         &axes_arrows);
-      internal::appendMarkers(axes_arrows, "pose", marker_array);
+      // internal::appendMarkers(axes_arrows, "pose", marker_array);
 
       visualization_msgs::Marker arrow;
       mav_visualization::drawArrowPoints(
@@ -165,7 +172,7 @@ void drawMavSampledTrajectoryWithMavMarker(
                                    (80.0 / 255.0)),
           0.3, &arrow);
       arrow.ns = positionDerivativeToString(derivative_order::ACCELERATION);
-      marker_array->markers.push_back(arrow);
+      // marker_array->markers.push_back(arrow);
 
       mav_visualization::drawArrowPoints(
           trajectory_point.position_W, trajectory_point.position_W + trajectory_point.velocity_W,
@@ -173,7 +180,7 @@ void drawMavSampledTrajectoryWithMavMarker(
                                    (196.0 / 255.0)),
           0.3, &arrow);
       arrow.ns = positionDerivativeToString(derivative_order::VELOCITY);
-      marker_array->markers.push_back(arrow);
+      // marker_array->markers.push_back(arrow);
 
       mav_visualization::MarkerGroup tmp_marker(additional_marker);
       tmp_marker.transform(mav_state.position_W, mav_state.orientation_W_B);

@@ -34,7 +34,8 @@ namespace mav_trajectory_generation {
 // If distance = 0.0, then these additional markers are disabled.
 void drawMavTrajectory(const Trajectory& trajectory, double distance,
                        const std::string& frame_id,
-                       visualization_msgs::MarkerArray* marker_array);
+                       visualization_msgs::MarkerArray* marker_array,
+                       bool isLocal);
 
 // Draw an eigen trajectory with additional markers spaced by distance (0.0 to
 // disable).
@@ -52,14 +53,16 @@ void drawMavSampledTrajectorybyTime(
 void drawMavTrajectoryWithMavMarker(
     const Trajectory& trajectory, double distance, const std::string& frame_id,
     const mav_visualization::MarkerGroup& additional_marker,
-    visualization_msgs::MarkerArray* marker_array);
+    visualization_msgs::MarkerArray* marker_array,
+    bool isLocal);
 
 // Draw a eigen trajectory with additional marker.
 void drawMavSampledTrajectoryWithMavMarker(
     const mav_msgs::EigenTrajectoryPoint::Vector& trajectory_points, double distance,
     const std::string& frame_id,
     const mav_visualization::MarkerGroup& additional_marker,
-    visualization_msgs::MarkerArray* marker_array);
+    visualization_msgs::MarkerArray* marker_array,
+    bool isLocal = false);
 
 // Visualize original vertices.
 void drawVertices(const Vertex::Vector& vertices, const std::string& frame_id,

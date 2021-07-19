@@ -310,7 +310,7 @@ void timerCallback(const ros::TimerEvent& e)
 							visualization_msgs::Marker mk;
                             Eigen::Vector3f pos((*it)(0), (*it)(1), (*it)(2));
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = (*it)(0);
@@ -358,7 +358,7 @@ void timerCallback(const ros::TimerEvent& e)
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = (*it)(0);
@@ -518,7 +518,7 @@ void timerCallback(const ros::TimerEvent& e)
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos->values[0];
@@ -591,7 +591,7 @@ void timerCallback(const ros::TimerEvent& e)
 
 							visualization_msgs::Marker mk;
 							mk.id = marr_index;
-							mk.type = mk.CUBE;
+							mk.type = mk.SPHERE;
 							marr_index += 1;
 							mk.header.frame_id = "map";
 							mk.pose.position.x = pos->values[0];

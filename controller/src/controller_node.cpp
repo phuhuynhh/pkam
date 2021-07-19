@@ -44,11 +44,12 @@ int main(int argc, char **argv)
 			case (DController::MISSION_STATE::TAKE_OFF):
 				if (drone_control.is_mission_finished()){
 					ROS_INFO("TakeOff Finished.");
-					//drone_control.mission_state  = DController::MISSION_STATE::COMMAND;
+					drone_control.mission_state  = DController::MISSION_STATE::COMMAND;
 				}
 				break;
 			case (DController::MISSION_STATE::COMMAND):
-					drone_control.flyToLocal(39,0,2.25);
+					drone_control.flyToLocal(7,0,2.25);
+					// drone_control.flyToLocal(39,0,2.25);
 					//drone_control.flyToLocal(); // (5,5,3) was a test case for A*
 				if (drone_control.is_mission_finished()){
 					drone_control.mission_state  = DController::MISSION_STATE::LAND;
@@ -67,8 +68,8 @@ int main(int argc, char **argv)
 			drone_control.public_local_position();
 			break;
 		
-		default:
-			// drone_control.public_raw_target();
+		default: // =)) -.-
+			drone_control.public_raw_target();
 			break;
 		}
 
