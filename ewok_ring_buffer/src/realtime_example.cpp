@@ -104,7 +104,7 @@ bool local_astar_active = false;
 bool local_rrt_active = false;
 
 ewok::APF AP_field;
-ewok::Grid3D Grid(100,100,8,0.5);
+ewok::Grid3D Grid(100,100,8,1.0);
 
 void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud)
 {
@@ -316,8 +316,9 @@ void timerCallback(const ros::TimerEvent& e)
 							mk.pose.position.x = (*it)(0);
 							mk.pose.position.y = (*it)(1);
 							mk.pose.position.z = (*it)(2);
-							mk.color.r = 1.0;
-                            mk.color.g = 1.0;
+							mk.color.r = 0.5;
+							mk.color.g = 0.0;
+							mk.color.b = 1.0;
 							mk.color.a = 1.0;
 							mk.scale.x = 0.4;
 							mk.scale.y = 0.4;
@@ -364,8 +365,9 @@ void timerCallback(const ros::TimerEvent& e)
 							mk.pose.position.x = (*it)(0);
 							mk.pose.position.y = (*it)(1);
 							mk.pose.position.z = (*it)(2);
-							mk.color.r = 1.0;
-                            mk.color.g = 1.0;
+							mk.color.r = 0.5;
+							mk.color.g = 0.0;
+							mk.color.b = 1.0;
 							mk.color.a = 1.0;
 							mk.scale.x = 0.4;
 							mk.scale.y = 0.4;
@@ -414,7 +416,7 @@ void timerCallback(const ros::TimerEvent& e)
 					bounds.setLow(1,  -5);
 					bounds.setHigh(1,  5);
 					bounds.setLow(2, 1.0);
-					bounds.setHigh(2, 3.0);
+					bounds.setHigh(2, 2.0);
 
 					space->as<ompl::base::SE3StateSpace>()->setBounds(bounds);
 
@@ -524,8 +526,9 @@ void timerCallback(const ros::TimerEvent& e)
 							mk.pose.position.x = pos->values[0];
 							mk.pose.position.y = pos->values[1];
 							mk.pose.position.z = pos->values[2];
-							mk.color.r = 1.0;
-                            mk.color.g = 1.0;
+							mk.color.r = 0.5;
+							mk.color.g = 0.0;
+							mk.color.b = 1.0;
 							mk.color.a = 1.0;
 							mk.scale.x = 0.4;
 							mk.scale.y = 0.4;
@@ -597,8 +600,9 @@ void timerCallback(const ros::TimerEvent& e)
 							mk.pose.position.x = pos->values[0];
 							mk.pose.position.y = pos->values[1];
 							mk.pose.position.z = pos->values[2];
-							mk.color.r = 1.0;
-                            mk.color.g = 1.0;
+							mk.color.r = 0.5;
+							mk.color.g = 0.0;
+							mk.color.b = 1.0;
 							mk.color.a = 1.0;
 							mk.scale.x = 0.4;
 							mk.scale.y = 0.4;

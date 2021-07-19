@@ -191,7 +191,7 @@ class RingBufferBase {
       m.scale.x = resolution_ * 0.9;
       m.scale.y = resolution_ * 0.9;
       m.scale.z = resolution_ * 0.9;
-      m.color.a = color(3);
+      m.color.a = 1.0;
 
       Vector3 offset_point;
       getPoint(offset_, offset_point);

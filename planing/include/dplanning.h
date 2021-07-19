@@ -164,7 +164,9 @@ public:
 
 	//for visualization in rviz
 	visualization_msgs::MarkerArray d_way_points;
+	visualization_msgs::MarkerArray dlocal_way_points;
 	visualization_msgs::MarkerArray global_trajectory_markerarray;
+	visualization_msgs::MarkerArray local_trajectory_markerarray;
 
 	visualization_msgs::Marker global_start_marker;
 	visualization_msgs::Marker global_end_marker;
