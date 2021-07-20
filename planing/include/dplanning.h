@@ -72,6 +72,7 @@
 #include <pcl_ros/transforms.h>
 
 #include <octomap/octomap.h>
+#include <octomap/math/Quaternion.h>
 #include <octomap_msgs/Octomap.h>
 
 #include <ompl/base/spaces/SE3StateSpace.h>

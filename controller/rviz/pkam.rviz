@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Axes1
+        - /MAVROS1
         - /MAVROS1/local_pose1
         - /MAP1
         - /MAP1/global_octomap1
@@ -153,16 +154,16 @@ Visualization Manager:
           Axes Radius: 0.10000000149011612
           Class: rviz/Pose
           Color: 239; 41; 41
-          Enabled: false
+          Enabled: true
           Head Length: 0.5
           Head Radius: 0.30000001192092896
           Name: local_pose
-          Shaft Length: 1.5
+          Shaft Length: 0.5
           Shaft Radius: 0.10000000149011612
           Shape: Arrow
           Topic: /mavros/local_position/pose
           Unreliable: false
-          Value: false
+          Value: true
       Enabled: true
       Name: MAVROS
     - Class: rviz/Group
@@ -220,7 +221,7 @@ Visualization Manager:
           Marker Topic: /planning/way_points_local
           Name: MarkerArray
           Namespaces:
-            {}
+            "": true
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -228,7 +229,7 @@ Visualization Manager:
           Marker Topic: /planning/generated_trajectory_local
           Name: MarkerArray
           Namespaces:
-            {}
+            path: true
           Queue Size: 100
           Value: true
       Enabled: true
@@ -254,7 +255,7 @@ Visualization Manager:
           Value: true
         odom_ned:
           Value: true
-      Marker Scale: 3
+      Marker Scale: 2
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -296,25 +297,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 25.324644088745117
+      Distance: 11.634875297546387
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 26.742660522460938
-        Y: -2.0904831886291504
-        Z: 2.1142875993973576e-5
+        X: 2.3153748512268066
+        Y: 2.943678140640259
+        Z: 1.875869020295795e-5
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4347967505455017
+      Pitch: 1.3097962141036987
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 1.977227807044983
+      Yaw: 2.167229413986206
     Saved: ~
 Window Geometry:
   Color:

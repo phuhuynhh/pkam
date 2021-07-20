@@ -576,6 +576,7 @@ void DPlanning::run()
 					Eigen::VectorXd vel_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::VELOCITY);
 					Eigen::VectorXd acce_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::ACCELERATION);
 
+					float yaw = octomap::point3d(vel_d(0), vel_d(1), vel_d(2)).yaw();
 					//PositionTarget Message Format.
 
 					setpoint_raw.header.stamp = ros::Time::now();
@@ -590,27 +591,45 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.x = acce_d(0);
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
+					
+					double angle = octomap::point3d(vel_d(0), vel_d(1), 0).angleTo(octomap::point3d(1,0,0));
+					octomath::Quaternion quat( 
+					octomap::point3d(1,0,0).cross(octomap::point3d(vel_d(0), vel_d(1), 0)), angle);
+					octomap::point3d euler = quat.toEuler();
+					setpoint_raw.yaw = euler.z();
 
 					trajectory_subset.poses.clear();
-					//5s ahead
-					for(int i = 0; i < 80; i++){
-						d_future += 0.1;
-						if(d_future > global_trajectory.getMaxTime()){
-							break;
-						}
-						Eigen::VectorXd position_future = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
 
+					geometry_msgs::PoseStamped target_pose;
+					std::vector<Eigen::VectorXd> evaluate_result;
+					if(dt_global + 8.0 > global_trajectory.getMaxTime()){
+						global_trajectory.evaluateRange(dt_global, 
+						global_trajectory.getMaxTime() - 0.00001,
+						0.01,
+						mav_trajectory_generation::derivative_order::POSITION,
+						&evaluate_result);
+					}
+					else{
+						global_trajectory.evaluateRange(dt_global, 
+						dt_global + 8.0,
+						0.01,
+						mav_trajectory_generation::derivative_order::POSITION,
+						&evaluate_result);
+					}
+
+					for(int i = 0; i < evaluate_result.size(); i++){
+						Eigen::VectorXd position_future = evaluate_result[i];
 						geometry_msgs::Pose future_pose;
 						future_pose.position.x = position_future(0);
 						future_pose.position.y = position_future(1);
 						future_pose.position.z = position_future(2);
 
 						trajectory_subset.poses.push_back(future_pose);
+
 					}
+
 					ros_client->traj_subset_pub.publish(trajectory_subset);
 
-
-					geometry_msgs::PoseStamped target_pose;
 					if(dt_global + local_ahead_time > global_trajectory.getMaxTime()){
 						Eigen::VectorXd position_future = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, 
 						mav_trajectory_generation::derivative_order::POSITION);
@@ -663,10 +682,15 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.x = acce_d(0);
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
+					double angle = octomap::point3d(vel_d(0), vel_d(1), 0).angleTo(octomap::point3d(1,0,0));
+					octomath::Quaternion quat( 
+					octomap::point3d(1,0,0).cross(octomap::point3d(vel_d(0), vel_d(1),0)), angle);
+					octomap::point3d euler = quat.toEuler();
+					setpoint_raw.yaw = euler.z();
 
 					trajectory_subset.poses.clear();
-					for(int i = 0; i < 80; i++){
-						d_future += 0.1;
+					for(int i = 0; i < 800; i++){
+						d_future += 0.01;
 						Eigen::VectorXd position_future;
 						if(d_future > local_trajectory.getMaxTime()){
 							if(dt_global + i > global_trajectory.getMaxTime()){
