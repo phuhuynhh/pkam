@@ -205,7 +205,7 @@ Visualization Manager:
           Marker Topic: /planning/generated_trajectory
           Name: Trajectory
           Namespaces:
-            path: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -213,7 +213,7 @@ Visualization Manager:
           Marker Topic: /planning/way_points
           Name: WayPoint
           Namespaces:
-            "": true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -221,7 +221,7 @@ Visualization Manager:
           Marker Topic: /planning/way_points_local
           Name: MarkerArray
           Namespaces:
-            "": true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -229,7 +229,7 @@ Visualization Manager:
           Marker Topic: /planning/generated_trajectory_local
           Name: MarkerArray
           Namespaces:
-            path: true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -297,25 +297,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 11.634875297546387
+      Distance: 10.776923179626465
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.3153748512268066
-        Y: 2.943678140640259
-        Z: 1.875869020295795e-5
+        X: 1.725553035736084
+        Y: 1.0927150249481201
+        Z: 1.6374504411942326e-5
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.3097962141036987
+      Pitch: 0.5747969746589661
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 2.167229413986206
+      Yaw: 2.2372353076934814
     Saved: ~
 Window Geometry:
   Color:

@@ -183,7 +183,7 @@ void DPlanning::run()
 						// Start = current position
 						// end = desired position and velocity
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
-							
+						dlocal_way_points.markers.clear();	
 						for (int path_idx = 0; path_idx < local_waypoints.poses.size(); path_idx++)
 						{
 							geometry_msgs::Pose pos = local_waypoints.poses[path_idx]; 
