@@ -54,6 +54,7 @@
 #include <mav_trajectory_generation_ros/ros_visualization.h>
 
 #include <visualization_msgs/MarkerArray.h>
+#include <fstream>
 
 using namespace message_filters;
 
@@ -236,6 +237,9 @@ void timerCallback(const ros::TimerEvent& e)
 {
     if(!initialized) return;
 
+    if(trajectory_subset.poses.size() > 0){
+        
+    }
 
     if(apf_active){
         Eigen::Vector3f grad;
@@ -284,7 +288,7 @@ void timerCallback(const ros::TimerEvent& e)
     }
 
     if(local_rrt_active){
-        Grid.Initilize(global_origin, &rrb);
+        Grid.Initilize(Eigen::Vector3f(global_origin(0), global_origin(1), 0.5), &rrb);
         ewok::Astar astar(local_target, &Grid);
         std::vector<Eigen::Vector3f> path;
         std::vector<Eigen::Vector3f> node_index;

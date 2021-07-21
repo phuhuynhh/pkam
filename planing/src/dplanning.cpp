@@ -231,18 +231,27 @@ void DPlanning::run()
 
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						double v_max, a_max;
+						v_max= 0.4;
+						a_max = 0.4;
+						segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 						// set up optimization problem
 						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 						// constrain velocity and acceleration
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
 
 						// solve trajectory
+
+						//TODO: LOG TIME FOR REAL TEST
+						auto time_start = std::chrono::high_resolution_clock::now();                      
 						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR LOCAL TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
 						opt.getTrajectory(&local_trajectory);
 
 						// use it for controller.
@@ -335,7 +344,13 @@ void DPlanning::run()
 					// perform setup steps for the planner
 					plan->setup();
 					// attempt to solve the problem within one second of planning time
+					
+					//TODO: LOG TIME FOR REAL TEST
+					auto time_start2 = std::chrono::high_resolution_clock::now(); 
 					ob::PlannerStatus solved = plan->solve(1);
+					auto time_end2 = std::chrono::high_resolution_clock::now();
+      				auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end2 - time_start2);
+					ROS_INFO("TIME FOR INFORMED RRT SOLVE: %d", duration2);
 
 					if (solved)
 					{
@@ -365,6 +380,9 @@ void DPlanning::run()
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 						og::PathGeometric *path = pdef->getSolutionPath()->as<og::PathGeometric>();
+
+						ROS_INFO("GLOBAL SOLUTION STATE: %d", path->getStateCount());
+
 						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
 						{
 							const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
@@ -414,18 +432,27 @@ void DPlanning::run()
 
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 0.5, 0.5);
+						double v_max, a_max;
+						v_max= 0.4;
+						a_max = 0.4;
+						segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 						// set up optimization problem
 						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 						// constrain velocity and acceleration
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.5);
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.5);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
 
 						// solve trajectory
+						//TODO: LOG TIME FOR REAL TEST
+						auto time_start = std::chrono::high_resolution_clock::now();                      
 						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR GLOBAL TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+
 						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
@@ -452,12 +479,12 @@ void DPlanning::run()
 				}
 				case PLANNING_STEP::ASTAR_PLANNING:
 				{
-					this->grid = new Grid3D(160,20,5,0.5);
+					this->grid = new Grid3D(160,20,10,0.5);
 					ROS_INFO("GLOBAL ASTAR ACTIVE");
-					octomap::point3d current_pos(0,
-						0,
-						2);	
-					grid->Initilize(current_pos);
+					octomap::point3d current_pos(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);	
+					grid->Initilize(octomap::point3d(current_pos.x(), current_pos.y(), 0));
 					grid->readOctomapMsg(this->octomap_msgs);
 
 					astar = new Astar(
@@ -481,6 +508,7 @@ void DPlanning::run()
 						// end = desired position and velocity
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
+						
 						int marr_index = 0;
 						for(std::vector<octomap::point3d>::iterator it = node_index.begin(); it != node_index.end(); ++it){
 
@@ -737,16 +765,16 @@ void DPlanning::run()
 				case PLANNING_STEP::VISUALIZATION_GLOBAL: {
 					this->grid = new Grid3D(160,160,10,0.5);
 					ROS_INFO("GLOBAL ASTAR ACTIVE");
-					octomap::point3d current_pos(0,
-						0,
-						2);	
-					grid->Initilize(current_pos);
+					octomap::point3d current_pos(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);	
+					grid->Initilize(octomap::point3d(current_pos.x(), current_pos.y(), 0));
 					grid->readOctomapMsg(this->octomap_msgs);
 
 					astar = new Astar(
 					octomap::point3d(endpoint_pos_ENU.pose.position.x,
 						endpoint_pos_ENU.pose.position.y,
-						0),
+						endpoint_pos_ENU.pose.position.z),
 					this->grid);
 					ROS_INFO("GLOBAL ASTAR ACTIVE1");
 
@@ -1407,6 +1435,7 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 //TODO : Khang VO
 void DPlanning::occ_trigger_callback(const std_msgs::BoolConstPtr &msg){
 	if(msg->data){
+		// planning_type = PLANNING_STEP::LOCAL_PLANNING;
 		planning_type = PLANNING_STEP::LOCAL_PLANNING;
 		std_msgs::Bool local_planning;
 		local_planning.data = true;
