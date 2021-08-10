@@ -138,7 +138,7 @@ void drawMavSampledTrajectoryWithMavMarker(
   visualization_msgs::Marker line_strip;
   line_strip.type = visualization_msgs::Marker::LINE_STRIP;
   if(isLocal){
-    line_strip.color = mav_visualization::Color::Green();
+    line_strip.color = mav_visualization::Color::Teal();
   }
   else{
     line_strip.color = mav_visualization::Color::Orange();

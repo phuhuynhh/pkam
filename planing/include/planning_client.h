@@ -70,8 +70,11 @@ class PlanningClient
     // Visualize Marker Public.
     ros::Publisher grid_marker_pub;
     ros::Publisher global_traj_pub;
+    ros::Publisher local_traj_pub;
     ros::Publisher vel_marker_pub;
     ros::Publisher way_points_pub;
+    ros::Publisher local_way_points_pub;
+
 
     // Visualize Trajectory
     ros::Publisher globalmarker_start_pub;

@@ -87,7 +87,9 @@ void PlanningClient::init(DPlanning *const drone_planning){
 	// Visualizer Marker
 	grid_marker_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/grid", 10);
 	way_points_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/way_points", 10);
+	local_way_points_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/way_points_local", 10);
 	global_traj_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/generated_trajectory", 10);
+	local_traj_pub = nh_->advertise<visualization_msgs::MarkerArray>("/planning/generated_trajectory_local", 10);
 	vel_marker_pub = nh_->advertise<visualization_msgs::Marker>("/planning/velocity", 10);
 
 }

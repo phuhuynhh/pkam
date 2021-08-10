@@ -22,7 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 # find_package(catkin_simple REQUIRED)
 find_package(Eigen3 REQUIRED)
-# find_package(octomap REQUIRED)
+find_package(octomap REQUIRED)
 find_package(PCL REQUIRED)
 
 add_definitions(${PCL_DEFINITIONS})
@@ -37,7 +37,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 link_libraries(${catkin_LIBRARIES} ${OMPL_LIBRARY_DIRS})
 
 add_executable(realtime_example src/realtime_example.cpp)
-target_link_libraries(realtime_example ${PCL_LIBRARIES} ${OMPL_LIBRARIES} ${catkin_LIBRARIES})
+target_link_libraries(realtime_example ${PCL_LIBRARIES} ${OMPL_LIBRARIES} ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES})
 
 
 # install(TARGETS realtime_example RUNTIME DESTINATION ${PROJECT_SOURCE_DIR}/../../../devel/lib/${PROJECT_NAME})

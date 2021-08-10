@@ -19,6 +19,8 @@ DPlanning::DPlanning(PlanningClient *ros_client)
 	this->nh_ = new ros::NodeHandle("~");
 	this->nh_->getParam("/dplanning/planning", this->planning);
 
+
+
 	// synchronized subscriber for pointcloud and odometry
     // message_filters::Subscriber<nav_msgs::Odometry> odom_sub(*nh_, "/mavros/local_position/odom", 1);
     // message_filters::Subscriber<sensor_msgs::PointCloud2> pcl_sub(*nh_, "/camera/depth/color/points", 1);
@@ -71,7 +73,7 @@ void DPlanning::run()
 			{
 				case PLANNING_STEP::TAKE_OFF:
 				{
-					if (distance(d_local_position, endpoint_pos_ENU) < 0.2)
+					if (distance(d_local_position, endpoint_pos_ENU) < 0.15)
 					{
 						double travel_time = ros::Time::now().toSec() - start_time;
 						ROS_INFO("Distance : %f", distance(d_local_position, endpoint_pos_ENU));
@@ -184,22 +186,24 @@ void DPlanning::run()
 							
 						for (int path_idx = 0; path_idx < local_waypoints.poses.size(); path_idx++)
 						{
-
-							// visualization_msgs::Marker mk;
-							// mk.id = marr_index;
-							// mk.type = mk.SPHERE;
-							// marr_index += 1;
-							// mk.header.frame_id = "map";
-							// mk.pose.position.x = pos->values[0];
-							// mk.pose.position.y = pos->values[1];
-							// mk.pose.position.z = pos->values[2];
-							// mk.color.r = 1.0;
-							// mk.color.a = 1.0;
-							// mk.scale.x = 0.2;
-							// mk.scale.y = 0.2;
-							// mk.scale.z = 0.2;
-							// this->d_way_points.markers.push_back(mk);
 							geometry_msgs::Pose pos = local_waypoints.poses[path_idx]; 
+
+							visualization_msgs::Marker mk;
+							mk.id = marr_index;
+							mk.type = mk.SPHERE;
+							marr_index += 1;
+							mk.header.frame_id = "map";
+							mk.pose.position.x = pos.position.x;
+							mk.pose.position.y = pos.position.y;
+							mk.pose.position.z = pos.position.z;
+							mk.color.r = 0.5;
+							mk.color.g = 0.0;
+							mk.color.b = 1.0;
+							mk.color.a = 1.0;
+							mk.scale.x = 0.4;
+							mk.scale.y = 0.4;
+							mk.scale.z = 0.4;
+							this->dlocal_way_points.markers.push_back(mk);
 
 							if (path_idx == 0){
 								start.makeStartOrEnd(Eigen::Vector3d(pos.position.x, pos.position.y, pos.position.z), derivative_to_optimize);
@@ -212,8 +216,8 @@ void DPlanning::run()
 							{
 								end.makeStartOrEnd(Eigen::Vector3d(pos.position.x, pos.position.y, pos.position.z), derivative_to_optimize);
 								// set start point's velocity to be constrained to current velocity
-								// end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(target_vel_d(0), target_vel_d(1), target_vel_d(2)));
-								// end.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(target_acce_d(0), target_acce_d(1), target_acce_d(2)));
+								end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(target_vel_d(0), target_vel_d(1), target_vel_d(2)));
+								end.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(target_acce_d(0), target_acce_d(1), target_acce_d(2)));
 								vertices.push_back(end);
 							}
 							else
@@ -250,13 +254,13 @@ void DPlanning::run()
 						// double sampling_interval = 0.05;
 						// bool success = mav_trajectory_generation::sampleWholeTrajectory(global_trajectory, sampling_interval, &states);
 
-						// double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
+						double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 						std::string frame_id = "map";
 
 						// // From Trajectory class:
-						// mav_trajectory_generation::drawMavTrajectory(global_trajectory, distance, frame_id, &global_trajectory_markerarray, false);
-						// ros_client->way_points_pub.publish(d_way_points);
-						// ros_client->global_traj_pub.publish(global_trajectory_markerarray);
+						mav_trajectory_generation::drawMavTrajectory(local_trajectory, distance, frame_id, &local_trajectory_markerarray, true);
+						ros_client->local_way_points_pub.publish(dlocal_way_points);
+						ros_client->local_traj_pub.publish(local_trajectory_markerarray);
 						local_start_time = ros::Time::now().toSec();
 						pre_time = 0;
 						this->planning_type = PLANNING_STEP::FOLLOW_LOCAL_TRAJECTORY;
@@ -284,19 +288,19 @@ void DPlanning::run()
 
 					//TODO : Assign Khang VO.
 					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
-					// bounds.setLow(0, _min_bounds[0]);
-					// bounds.setHigh(0, _max_bounds[0]);
-					// bounds.setLow(1,  _min_bounds[1]);
-					// bounds.setHigh(1,  _max_bounds[1]);
-					// bounds.setLow(2, 1.5);
-					// bounds.setHigh(2, 2.5);
+					bounds.setLow(0, _min_bounds[0]);
+					bounds.setHigh(0, _max_bounds[0]);
+					bounds.setLow(1,  _min_bounds[1]);
+					bounds.setHigh(1,  _max_bounds[1]);
+					bounds.setLow(2, _min_bounds[2]);
+					bounds.setHigh(2,   _max_bounds[2]);
 
-					bounds.setLow(0, -40);
-					bounds.setHigh(0, 40);
-					bounds.setLow(1,  -5);
-					bounds.setHigh(1,  5);
-					bounds.setLow(2, 1.0);
-					bounds.setHigh(2, 3.0);
+					// bounds.setLow(0, -40);
+					// bounds.setHigh(0, 40);
+					// bounds.setLow(1,  -5);
+					// bounds.setHigh(1,  5);
+					// bounds.setLow(2, 1.0);
+					// bounds.setHigh(2, 2.0);
 
 					space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -707,7 +711,7 @@ void DPlanning::run()
 					break;
 				}
 				case PLANNING_STEP::VISUALIZATION_GLOBAL: {
-					this->grid = new Grid3D(160,20,5,0.5);
+					this->grid = new Grid3D(160,160,10,0.5);
 					ROS_INFO("GLOBAL ASTAR ACTIVE");
 					octomap::point3d current_pos(0,
 						0,
@@ -718,7 +722,7 @@ void DPlanning::run()
 					astar = new Astar(
 					octomap::point3d(endpoint_pos_ENU.pose.position.x,
 						endpoint_pos_ENU.pose.position.y,
-						endpoint_pos_ENU.pose.position.z),
+						0),
 					this->grid);
 					ROS_INFO("GLOBAL ASTAR ACTIVE1");
 
@@ -920,19 +924,19 @@ void DPlanning::run()
 
 					//TODO : Assign Khang VO.
 					// config pipeline, ref : https://github.com/kosmastsk/path_planning/blob/master/src/path_planning.cpp
-					// bounds.setLow(0, _min_bounds[0]);
-					// bounds.setHigh(0, _max_bounds[0]);
-					// bounds.setLow(1,  _min_bounds[1]);
-					// bounds.setHigh(1,  _max_bounds[1]);
-					// bounds.setLow(2, 1.5);
-					// bounds.setHigh(2, 2.5);
+					bounds.setLow(0, _min_bounds[0]);
+					bounds.setHigh(0, _max_bounds[0]);
+					bounds.setLow(1,  _min_bounds[1]);
+					bounds.setHigh(1,  _max_bounds[1]);
+					bounds.setLow(2,   _min_bounds[2]);
+					bounds.setHigh(2,   _max_bounds[2]);
 
-					bounds.setLow(0, -40);
-					bounds.setHigh(0, 40);
-					bounds.setLow(1,  -5);
-					bounds.setHigh(1,  5);
-					bounds.setLow(2, 1.0);
-					bounds.setHigh(2, 3.0);
+					// bounds.setLow(0, -40);
+					// bounds.setHigh(0, 40);
+					// bounds.setLow(1,  -5);
+					// bounds.setHigh(1,  5);
+					// bounds.setLow(2, 1.0);
+					// bounds.setHigh(2, 2.0);
 
 					space->as<ob::SE3StateSpace>()->setBounds(bounds);
 
@@ -1302,7 +1306,10 @@ void DPlanning::global_position_callback(const sensor_msgs::NavSatFix::ConstPtr 
 void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
 	if (!endpoint_active)
-	{
+	{	
+		if(distance(endpoint_pos_ENU, *msg) < 0.2){
+			return;
+		}
 		endpoint_pos_ENU = *msg;
 		ROS_INFO("Requested trajectory : \n start (x,y,z) : %f %f %f \n stop (x,y,z): %f %f %f",
 			d_local_position.pose.position.x, d_local_position.pose.position.y, d_local_position.pose.position.z,
@@ -1321,9 +1328,30 @@ void DPlanning::get_target_position_callback(const geometry_msgs::PoseStamped::C
 		// apf = new APF(this->grid);
 		// publishVisualize();
 
-		endpoint_active = true;
 		best_duration = 1000000000000;
 		worst_duration = 0;
+
+		if(d_local_position.pose.position.x > endpoint_pos_ENU.pose.position.x){
+			_max_bounds[0] = (double)d_local_position.pose.position.x + 10;
+			_min_bounds[0] = (double)endpoint_pos_ENU.pose.position.x - 10;
+		}
+		else{
+			_max_bounds[0] = (double)endpoint_pos_ENU.pose.position.x + 10;
+			_min_bounds[0] = (double)d_local_position.pose.position.x - 10;
+		}
+
+		if(d_local_position.pose.position.y > endpoint_pos_ENU.pose.position.y){
+			_max_bounds[1] = (double)d_local_position.pose.position.y + 10;
+			_min_bounds[1] = (double)endpoint_pos_ENU.pose.position.y - 10;
+		}
+		else{
+			_max_bounds[1] = (double)endpoint_pos_ENU.pose.position.y + 10;
+			_min_bounds[1] = (double)d_local_position.pose.position.y - 10;
+		}	
+		 _min_bounds[2] = 1.0;
+		 _max_bounds[2] = 2.0;
+
+		endpoint_active = true;
 	}
 }
 
@@ -1345,8 +1373,8 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 	// octomap::OcTree* tree_oct = reinterpret_cast<octomap::OcTree*>(tree_coloct);
 	octomap::OcTree* tree_oct = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
 	
-	tree_oct->getMetricMin(_min_bounds[0], _min_bounds[1], _min_bounds[2]);
-	tree_oct->getMetricMax(_max_bounds[0], _max_bounds[1], _max_bounds[2]);
+	// tree_oct->getMetricMin(_min_bounds[0], _min_bounds[1], _min_bounds[2]);
+	// tree_oct->getMetricMax(_max_bounds[0], _max_bounds[1], _max_bounds[2]);
 }
 
 
