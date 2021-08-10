@@ -183,7 +183,7 @@ void DPlanning::run()
 						// Start = current position
 						// end = desired position and velocity
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
-							
+						dlocal_way_points.markers.clear();	
 						for (int path_idx = 0; path_idx < local_waypoints.poses.size(); path_idx++)
 						{
 							geometry_msgs::Pose pos = local_waypoints.poses[path_idx]; 
@@ -231,18 +231,27 @@ void DPlanning::run()
 
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 0.4, 0.4);
+						double v_max, a_max;
+						v_max= 0.4;
+						a_max = 0.4;
+						segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 						// set up optimization problem
 						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 						// constrain velocity and acceleration
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.4);
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.4);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
 
 						// solve trajectory
+
+						//TODO: LOG TIME FOR REAL TEST
+						auto time_start = std::chrono::high_resolution_clock::now();                      
 						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR LOCAL TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
 						opt.getTrajectory(&local_trajectory);
 
 						// use it for controller.
@@ -335,7 +344,13 @@ void DPlanning::run()
 					// perform setup steps for the planner
 					plan->setup();
 					// attempt to solve the problem within one second of planning time
+					
+					//TODO: LOG TIME FOR REAL TEST
+					auto time_start2 = std::chrono::high_resolution_clock::now(); 
 					ob::PlannerStatus solved = plan->solve(1);
+					auto time_end2 = std::chrono::high_resolution_clock::now();
+      				auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end2 - time_start2);
+					ROS_INFO("TIME FOR INFORMED RRT SOLVE: %d", duration2);
 
 					if (solved)
 					{
@@ -365,6 +380,9 @@ void DPlanning::run()
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
 						og::PathGeometric *path = pdef->getSolutionPath()->as<og::PathGeometric>();
+
+						ROS_INFO("GLOBAL SOLUTION STATE: %d", path->getStateCount());
+
 						for (std::size_t path_idx = 0; path_idx < path->getStateCount(); path_idx++)
 						{
 							const ob::SE3StateSpace::StateType *se3state = path->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
@@ -414,18 +432,27 @@ void DPlanning::run()
 
 						// setimate initial segment times
 						std::vector<double> segment_times;
-						segment_times = estimateSegmentTimes(vertices, 0.5, 0.5);
+						double v_max, a_max;
+						v_max= 0.4;
+						a_max = 0.4;
+						segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 						// set up optimization problem
 						const int N = 6;
 						mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
 						opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
 
 						// constrain velocity and acceleration
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, 0.5);
-						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, 0.5);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
+						opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
 
 						// solve trajectory
+						//TODO: LOG TIME FOR REAL TEST
+						auto time_start = std::chrono::high_resolution_clock::now();                      
 						opt.optimize();
+						auto time_end = std::chrono::high_resolution_clock::now();
+      					auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+						ROS_INFO("TIME FOR GLOBAL TO OPTIMIZATION: %d, COST: %f", duration, opt.getCost());
+
 						opt.getTrajectory(&global_trajectory);
 
 						// use it for controller.
@@ -452,12 +479,12 @@ void DPlanning::run()
 				}
 				case PLANNING_STEP::ASTAR_PLANNING:
 				{
-					this->grid = new Grid3D(160,20,5,0.5);
+					this->grid = new Grid3D(160,20,10,0.5);
 					ROS_INFO("GLOBAL ASTAR ACTIVE");
-					octomap::point3d current_pos(0,
-						0,
-						2);	
-					grid->Initilize(current_pos);
+					octomap::point3d current_pos(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);	
+					grid->Initilize(octomap::point3d(current_pos.x(), current_pos.y(), 0));
 					grid->readOctomapMsg(this->octomap_msgs);
 
 					astar = new Astar(
@@ -481,6 +508,7 @@ void DPlanning::run()
 						// end = desired position and velocity
 						mav_trajectory_generation::Vertex start(dimension), end(dimension);
 
+						
 						int marr_index = 0;
 						for(std::vector<octomap::point3d>::iterator it = node_index.begin(); it != node_index.end(); ++it){
 
@@ -576,6 +604,7 @@ void DPlanning::run()
 					Eigen::VectorXd vel_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::VELOCITY);
 					Eigen::VectorXd acce_d = global_trajectory.evaluate(dt_global, mav_trajectory_generation::derivative_order::ACCELERATION);
 
+					float yaw = octomap::point3d(vel_d(0), vel_d(1), vel_d(2)).yaw();
 					//PositionTarget Message Format.
 
 					setpoint_raw.header.stamp = ros::Time::now();
@@ -590,27 +619,45 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.x = acce_d(0);
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
+					
+					double angle = octomap::point3d(vel_d(0), vel_d(1), 0).angleTo(octomap::point3d(1,0,0));
+					octomath::Quaternion quat( 
+					octomap::point3d(1,0,0).cross(octomap::point3d(vel_d(0), vel_d(1), 0)), angle);
+					octomap::point3d euler = quat.toEuler();
+					setpoint_raw.yaw = euler.z();
 
 					trajectory_subset.poses.clear();
-					//5s ahead
-					for(int i = 0; i < 80; i++){
-						d_future += 0.1;
-						if(d_future > global_trajectory.getMaxTime()){
-							break;
-						}
-						Eigen::VectorXd position_future = global_trajectory.evaluate(d_future, mav_trajectory_generation::derivative_order::POSITION);
 
+					geometry_msgs::PoseStamped target_pose;
+					std::vector<Eigen::VectorXd> evaluate_result;
+					if(dt_global + 8.0 > global_trajectory.getMaxTime()){
+						global_trajectory.evaluateRange(dt_global, 
+						global_trajectory.getMaxTime() - 0.00001,
+						0.01,
+						mav_trajectory_generation::derivative_order::POSITION,
+						&evaluate_result);
+					}
+					else{
+						global_trajectory.evaluateRange(dt_global, 
+						dt_global + 8.0,
+						0.01,
+						mav_trajectory_generation::derivative_order::POSITION,
+						&evaluate_result);
+					}
+
+					for(int i = 0; i < evaluate_result.size(); i++){
+						Eigen::VectorXd position_future = evaluate_result[i];
 						geometry_msgs::Pose future_pose;
 						future_pose.position.x = position_future(0);
 						future_pose.position.y = position_future(1);
 						future_pose.position.z = position_future(2);
 
 						trajectory_subset.poses.push_back(future_pose);
+
 					}
+
 					ros_client->traj_subset_pub.publish(trajectory_subset);
 
-
-					geometry_msgs::PoseStamped target_pose;
 					if(dt_global + local_ahead_time > global_trajectory.getMaxTime()){
 						Eigen::VectorXd position_future = global_trajectory.evaluate(global_trajectory.getMaxTime() - 0.00001, 
 						mav_trajectory_generation::derivative_order::POSITION);
@@ -663,10 +710,15 @@ void DPlanning::run()
 					setpoint_raw.acceleration_or_force.x = acce_d(0);
 					setpoint_raw.acceleration_or_force.y = acce_d(1);
 					setpoint_raw.acceleration_or_force.z = acce_d(2);
+					double angle = octomap::point3d(vel_d(0), vel_d(1), 0).angleTo(octomap::point3d(1,0,0));
+					octomath::Quaternion quat( 
+					octomap::point3d(1,0,0).cross(octomap::point3d(vel_d(0), vel_d(1),0)), angle);
+					octomap::point3d euler = quat.toEuler();
+					setpoint_raw.yaw = euler.z();
 
 					trajectory_subset.poses.clear();
-					for(int i = 0; i < 80; i++){
-						d_future += 0.1;
+					for(int i = 0; i < 800; i++){
+						d_future += 0.01;
 						Eigen::VectorXd position_future;
 						if(d_future > local_trajectory.getMaxTime()){
 							if(dt_global + i > global_trajectory.getMaxTime()){
@@ -713,16 +765,16 @@ void DPlanning::run()
 				case PLANNING_STEP::VISUALIZATION_GLOBAL: {
 					this->grid = new Grid3D(160,160,10,0.5);
 					ROS_INFO("GLOBAL ASTAR ACTIVE");
-					octomap::point3d current_pos(0,
-						0,
-						2);	
-					grid->Initilize(current_pos);
+					octomap::point3d current_pos(d_local_position.pose.position.x,
+						d_local_position.pose.position.y,
+						d_local_position.pose.position.z);	
+					grid->Initilize(octomap::point3d(current_pos.x(), current_pos.y(), 0));
 					grid->readOctomapMsg(this->octomap_msgs);
 
 					astar = new Astar(
 					octomap::point3d(endpoint_pos_ENU.pose.position.x,
 						endpoint_pos_ENU.pose.position.y,
-						0),
+						endpoint_pos_ENU.pose.position.z),
 					this->grid);
 					ROS_INFO("GLOBAL ASTAR ACTIVE1");
 
@@ -1383,6 +1435,7 @@ void DPlanning::full_octomap_callback(const octomap_msgs::Octomap::ConstPtr &msg
 //TODO : Khang VO
 void DPlanning::occ_trigger_callback(const std_msgs::BoolConstPtr &msg){
 	if(msg->data){
+		// planning_type = PLANNING_STEP::LOCAL_PLANNING;
 		planning_type = PLANNING_STEP::LOCAL_PLANNING;
 		std_msgs::Bool local_planning;
 		local_planning.data = true;

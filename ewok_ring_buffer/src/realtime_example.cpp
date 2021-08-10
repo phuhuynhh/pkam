@@ -54,6 +54,7 @@
 #include <mav_trajectory_generation_ros/ros_visualization.h>
 
 #include <visualization_msgs/MarkerArray.h>
+#include <fstream>
 
 using namespace message_filters;
 
@@ -104,7 +105,7 @@ bool local_astar_active = false;
 bool local_rrt_active = false;
 
 ewok::APF AP_field;
-ewok::Grid3D Grid(100,100,8,1.0);
+ewok::Grid3D Grid(100,100,5,1.0);
 
 void odomCloudCallback(const nav_msgs::OdometryConstPtr& odom, const sensor_msgs::PointCloud2ConstPtr& cloud)
 {
@@ -236,6 +237,9 @@ void timerCallback(const ros::TimerEvent& e)
 {
     if(!initialized) return;
 
+    if(trajectory_subset.poses.size() > 0){
+        
+    }
 
     if(apf_active){
         Eigen::Vector3f grad;
@@ -253,7 +257,7 @@ void timerCallback(const ros::TimerEvent& e)
     }
 
     if(local_astar_active){
-        Grid.Initilize(global_origin, &rrb);
+        Grid.Initilize(Eigen::Vector3f(global_origin(0), global_origin(1), 0.5), &rrb);
         ewok::Astar astar(local_target, &Grid);
         std::vector<Eigen::Vector3f> path;
         std::vector<Eigen::Vector3f> node_index;
@@ -284,7 +288,7 @@ void timerCallback(const ros::TimerEvent& e)
     }
 
     if(local_rrt_active){
-        Grid.Initilize(global_origin, &rrb);
+        Grid.Initilize(Eigen::Vector3f(global_origin(0), global_origin(1), 0.5), &rrb);
         ewok::Astar astar(local_target, &Grid);
         std::vector<Eigen::Vector3f> path;
         std::vector<Eigen::Vector3f> node_index;
@@ -635,6 +639,13 @@ void timerCallback(const ros::TimerEvent& e)
     local_waypoints_pub4.publish(local_waypoints_markerarray4);
 
     for(std::vector<geometry_msgs::Pose>::iterator it = trajectory_subset.poses.begin(); it !=  trajectory_subset.poses.end(); ++it){
+        if(it->position.z < 0.1){
+            std_msgs::Bool local_collision;
+            local_collision.data = true;                
+            occ_trigger_pub.publish(local_collision);
+            ROS_INFO("FUTURE COLLISION");
+            break;
+        }
         Eigen::Vector3f grad;
         Eigen::Vector3f check_point(it->position.x, it->position.y, it->position.z);
         float distance = rrb.getDistanceWithGrad(check_point, grad);
